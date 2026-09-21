@@ -3,8 +3,8 @@
   "version": "1.0.0",
   "description": "Full-Stack AI Prompt Showcase, Creator Funnel, and Admin Management Platform",
   "scripts": {
-    "build": "cd client && npm install && npm run build",
-    "start": "cd server && npm install && node index.js",
+    "build": "cd client && npm install && npm run build && cd ../server && npm install",
+    "start": "cd server && node index.js",
     "server": "cd server && npm start",
     "client": "cd client && npm run dev",
     "seed": "cd server && npm run seed"
