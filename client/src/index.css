@@ -1,0 +1,65 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-[#FAF9F5] text-[#18181B] font-sans antialiased selection:bg-[#F71C25]/20 selection:text-[#F71C25];
+  }
+}
+
+/* Brand Palette: Red Orange (#F71C25) & Beeswax (#FBEFC5) */
+.bg-red-orange {
+  background-color: #F71C25;
+}
+
+.text-red-orange {
+  color: #F71C25;
+}
+
+.bg-beeswax {
+  background-color: #FBEFC5;
+}
+
+.border-beeswax {
+  border-color: #F0E2AF;
+}
+
+/* Red Orange to Beeswax Gradient (Pantone 1788 C -> Pantone 7499 C) */
+.gradient-red-beeswax {
+  background: linear-gradient(135deg, #F71C25 0%, #FF5A36 45%, #FBEFC5 100%);
+}
+
+.gradient-beeswax-soft {
+  background: linear-gradient(180deg, #FFFFFF 0%, #FCF8EE 100%);
+}
+
+/* Editorial Studio Card Styling */
+.vintage-panel,
+.editorial-card {
+  background: #FFFFFF;
+  border: 1px solid rgba(228, 228, 231, 0.9);
+  box-shadow: 0 4px 18px -4px rgba(24, 24, 27, 0.05);
+}
+
+.vintage-panel:hover,
+.editorial-card:hover {
+  border-color: rgba(247, 28, 37, 0.4);
+  box-shadow: 0 10px 25px -4px rgba(247, 28, 37, 0.08);
+}
+
+/* Custom scrollbar for clean light canvas */
+::-webkit-scrollbar {
+  width: 7px;
+  height: 7px;
+}
+::-webkit-scrollbar-track {
+  background: #F4F4F5;
+}
+::-webkit-scrollbar-thumb {
+  background: #D4D4D8;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #A1A1AA;
+}
