@@ -909,6 +909,98 @@ app.put('/api/prompts/:id', (req, res) => {
   }
 });
 
+// Batch update multiple shots in one atomic transaction with sketch re-rendering
+app.put('/api/prompts-batch', (req, res) => {
+  try {
+    const { shots } = req.body;
+    if (!Array.isArray(shots)) {
+      return res.status(400).json({ success: false, error: 'กรุณาส่งอาร์เรย์ shots' });
+    }
+
+    const updatedShots = [];
+    const updateStmt = db.prepare(`
+      UPDATE prompts SET
+        title = ?,
+        content = ?,
+        dialogue_script = ?,
+        camera_angle = ?,
+        camera_movement = ?,
+        shot_size = ?,
+        action_description = ?,
+        video_prompt = ?,
+        audio_foley = ?,
+        duration_seconds = ?,
+        image_url = ?
+      WHERE id = ?
+    `);
+
+    db.transaction(() => {
+      for (const s of shots) {
+        if (!s.id) continue;
+        const existing = db.prepare('SELECT * FROM prompts WHERE id = ?').get(s.id);
+        if (!existing) continue;
+
+        const updatedTitle = s.title !== undefined ? s.title : existing.title;
+        const updatedContent = s.content !== undefined ? s.content : (s.prompt !== undefined ? s.prompt : existing.content);
+        const updatedDialogue = s.dialogue_script !== undefined ? sanitizeThaiPolite(s.dialogue_script) : existing.dialogue_script;
+        const updatedAngle = s.camera_angle !== undefined ? s.camera_angle : existing.camera_angle;
+        const updatedMovement = s.camera_movement !== undefined ? s.camera_movement : existing.camera_movement;
+        const updatedShotSize = s.lens_focal !== undefined ? s.lens_focal : (s.shot_size !== undefined ? s.shot_size : existing.shot_size);
+        const updatedAction = s.action_description !== undefined ? s.action_description : (s.prompt !== undefined ? s.prompt : existing.action_description);
+        const updatedVideoPrompt = s.video_prompt !== undefined ? s.video_prompt : existing.video_prompt;
+        const updatedAudioFoley = s.audio_foley !== undefined ? s.audio_foley : existing.audio_foley;
+        const updatedDuration = s.duration_seconds !== undefined ? s.duration_seconds : existing.duration_seconds;
+        
+        let updatedImageUrl = existing.image_url;
+        // If image was a data:image/svg+xml sketch, re-render it with the new prompt
+        if (!updatedImageUrl || updatedImageUrl.startsWith('data:image/svg+xml')) {
+          const theme = resolveSketchTheme({
+            ...existing,
+            title: updatedTitle,
+            prompt: updatedContent,
+            action_description: updatedAction
+          });
+          updatedImageUrl = getStoryboardSketch({
+            ...existing,
+            title: updatedTitle,
+            prompt: updatedContent,
+            action_description: updatedAction,
+            camera_angle: updatedAngle,
+            lens_focal: updatedShotSize,
+            sketch_theme: theme
+          });
+        }
+
+        updateStmt.run(
+          updatedTitle,
+          updatedContent,
+          updatedDialogue,
+          updatedAngle,
+          updatedMovement,
+          updatedShotSize,
+          updatedAction,
+          updatedVideoPrompt,
+          updatedAudioFoley,
+          updatedDuration,
+          updatedImageUrl,
+          s.id
+        );
+
+        updatedShots.push(db.prepare('SELECT * FROM prompts WHERE id = ?').get(s.id));
+      }
+    })();
+
+    res.json({
+      success: true,
+      message: `อัปเดตข้อมูล ${updatedShots.length} ช็อตเรียบร้อยแล้ว`,
+      data: updatedShots
+    });
+  } catch (err) {
+    console.error('[PUT Prompts Batch Error]:', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // AI Context-Aware Shot Refiner (Refines a single shot without breaking series continuity)
 app.post('/api/prompts/:id/refine', async (req, res) => {
   try {

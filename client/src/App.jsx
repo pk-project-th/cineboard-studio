@@ -35,6 +35,7 @@ export default function App() {
   const [storyboardBuilderOpen, setStoryboardBuilderOpen] = useState(false);
   const [assetManagerOpen, setAssetManagerOpen] = useState(false);
   const [scriptImportOpen, setScriptImportOpen] = useState(false);
+  const [scriptSeedText, setScriptSeedText] = useState('');
   const [imageViewerOpen, setImageViewerOpen] = useState(false);
   const [videoModalOpen, setVideoModalOpen] = useState(false);
   const [clipEditorOpen, setClipEditorOpen] = useState(false);
@@ -326,7 +327,10 @@ export default function App() {
         onOpenAudio={() => setAudioModalOpen(true)}
         onOpenViralGuide={() => setViralGuideOpen(true)}
         onOpenGroqModal={() => setGroqModalOpen(true)}
-        onOpenScriptImporter={() => setScriptImportOpen(true)}
+        onOpenScriptImporter={() => {
+          setScriptSeedText('');
+          setScriptImportOpen(true);
+        }}
         currentView={currentView}
         setCurrentView={setCurrentView}
       />
@@ -370,6 +374,10 @@ export default function App() {
             onDeleteSeries={handleDeleteSeries}
             onStartNewProject={handleStartNewProject}
             promptsCount={prompts.length}
+            prompts={prompts}
+            onBatchUpdated={() => {
+              fetchPrompts(selectedSeriesId);
+            }}
           />
 
           {/* Canvas & Detail Inspector Split */}
@@ -429,7 +437,10 @@ export default function App() {
                     onStoryboardCommitted={handleStoryboardCommitted}
                     selectedItem={selectedItem}
                     onOpenGroqModal={() => setGroqModalOpen(true)}
-                    onOpenScriptImporter={() => setScriptImportOpen(true)}
+                    onOpenScriptImporter={(seed) => {
+                      if (typeof seed === 'string') setScriptSeedText(seed);
+                      setScriptImportOpen(true);
+                    }}
                     customPromptSeed={customPromptSeed}
                     selectedSeriesId={selectedSeriesId}
                     seriesList={seriesList}
@@ -499,6 +510,7 @@ export default function App() {
         isOpen={scriptImportOpen}
         onClose={() => setScriptImportOpen(false)}
         onStoryboardCommitted={handleStoryboardCommitted}
+        initialScript={scriptSeedText}
       />
 
       {/* Delete Confirmation Modal */}

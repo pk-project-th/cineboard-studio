@@ -1,9 +1,10 @@
 import { generateMasterProductionPrompt } from '../utils/masterPromptHelper';
 import MasterPromptModal from './MasterPromptModal';
+import BatchEditPromptsModal from './BatchEditPromptsModal';
 import React from 'react';
 import {
   ChevronDown, Share2, Sparkles, Image as ImageIcon, Video, Volume2, FileText,
-  Sliders, Grid, Folder, CheckSquare, Upload, Flame, Zap, Trash2
+  Sliders, Grid, Folder, CheckSquare, Upload, Flame, Zap, Trash2, Edit3
 } from 'lucide-react';
 
 export default function BoardHeader({
@@ -21,11 +22,14 @@ export default function BoardHeader({
   onSelectSeries,
   onDeleteSeries,
   onStartNewProject,
-  promptsCount = 0
+  promptsCount = 0,
+  prompts = [],
+  onBatchUpdated
 }) {
   const currentSeries = seriesList.find(s => s.id === selectedSeriesId);
   const [showMasterModal, setShowMasterModal] = React.useState(false);
   const [masterText, setMasterText] = React.useState("");
+  const [showBatchModal, setShowBatchModal] = React.useState(false);
 
   return (
     <div className="bg-white border-b border-stone-200/90 select-none shadow-2xs">
@@ -84,6 +88,17 @@ export default function BoardHeader({
             <Sparkles className="w-3.5 h-3.5 text-[#F71C25]" />
             <span className="hidden sm:inline">📋 Master Prompt ทั้งเรื่อง</span>
             <span className="sm:hidden">Master Prompt</span>
+          </button>
+
+          {/* Batch Edit All Prompts in Project Button */}
+          <button
+            onClick={() => setShowBatchModal(true)}
+            className="px-3 py-1.5 rounded-xl bg-stone-100 hover:bg-stone-200 border border-stone-200 text-stone-900 font-bold text-xs flex items-center gap-1.5 transition-all shadow-2xs cursor-pointer flex-shrink-0"
+            title="เปิดหน้าต่างแก้ไขและปรับแต่ง Prompt ของทุกช็อตในโปรเจกต์พร้อมกัน"
+          >
+            <Edit3 className="w-3.5 h-3.5 text-[#F71C25]" />
+            <span className="hidden sm:inline">✏️ แก้ไข Prompt ทุกช็อต</span>
+            <span className="sm:hidden">แก้ไขทุกช็อต</span>
           </button>
   
           {/* Quick Delete Series Button if a specific series is selected */}
@@ -259,12 +274,19 @@ export default function BoardHeader({
           </button>
         </div>
         <MasterPromptModal
-        isOpen={showMasterModal}
-        onClose={() => setShowMasterModal(false)}
-        masterPromptText={masterText}
-        projectTitle={currentSeries?.title}
-      />
+          isOpen={showMasterModal}
+          onClose={() => setShowMasterModal(false)}
+          masterPromptText={masterText}
+          projectTitle={currentSeries?.title}
+        />
+        <BatchEditPromptsModal
+          isOpen={showBatchModal}
+          onClose={() => setShowBatchModal(false)}
+          prompts={prompts}
+          projectTitle={currentSeries?.title}
+          onBatchUpdated={onBatchUpdated}
+        />
+      </div>
     </div>
-  </div>
   );
 }

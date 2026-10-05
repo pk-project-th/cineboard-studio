@@ -4,23 +4,44 @@
  * Fully offline, no Groq or internet required!
  */
 
+function normalizeScriptText(rawText) {
+  if (!rawText) return '';
+  let text = String(rawText).replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+
+  // Insert double newline before Scene / Shot headers if glued to previous sentence without newline
+  text = text.replace(/([^\n])\s*(?:(?:Scene|Shot|ฉากที่|ฉาก|ช็อตที่|ช็อต|ซีน)\s*(\d+)[\s:：.-]*)/gi, '$1\n\nScene $2: ');
+
+  // Insert newline before Prompt:
+  text = text.replace(/([^\n])\s*(Prompt\s*[:：])/gi, '$1\n$2');
+
+  // Insert newline before Visual Style Reference / Visual Style:
+  text = text.replace(/([^\n])\s*(Visual\s*Style(?:[^\n:：]*?)?[:：])/gi, '$1\n$2');
+
+  // Insert newline before Audio / Foley / Sound / Dialogue
+  text = text.replace(/([^\n])\s*((?:Audio|Foley|Sound|เสียง|ซาวด์|Dialogue|บทพูด)\s*[:：])/gi, '$1\n$2');
+
+  return text;
+}
+
 function parseMultiSceneScript(rawText) {
   if (!rawText || typeof rawText !== 'string' || !rawText.trim()) {
     return null;
   }
 
-  const text = rawText.trim();
+  const text = normalizeScriptText(rawText).trim();
   const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
 
   // 1. Detect Project Title
   let projectTitle = '';
-  const titleLine = lines.find(l => /^(?:[🎬🎥\s]*(?:Prompt\s*\d+\s*:|Title\s*:|เรื่อง\s*:|ชื่อเรื่อง\s*:))/i.test(l));
-  if (titleLine) {
-    projectTitle = titleLine.replace(/^[🎬🎥\s]*(?:Prompt\s*\d+\s*:|Title\s*:|เรื่อง\s*:|ชื่อเรื่อง\s*:)\s*/i, '').replace(/["“”]/g, '').trim();
+  const titleMatch = text.match(/^[🎬🎥\s]*(?:(?:Prompt|Content|คอนเทนต์|บท|สคริปต์)\s*\d*\s*[:：]|(?:Title|เรื่อง|ชื่อเรื่อง)\s*[:：])\s*([^\n\r]+)/im);
+  if (titleMatch) {
+    let rawTitle = titleMatch[1].trim();
+    rawTitle = rawTitle.replace(/Visual\s*Style.*$/i, '').replace(/["“”]/g, '').trim();
+    if (rawTitle.length >= 2) projectTitle = rawTitle;
   } else {
     // If first line doesn't start with Scene/Shot, use first line as title
     if (lines[0] && !/^(?:Scene|Shot|ฉาก|ช็อต|ซีน|\d+\.)/i.test(lines[0])) {
-      projectTitle = lines[0].replace(/^[🎬🎥\s*#*-]+/, '').replace(/["“”]/g, '').trim();
+      projectTitle = lines[0].replace(/^[🎬🎥\s*#*-]+/, '').replace(/Visual\s*Style.*$/i, '').replace(/["“”]/g, '').trim();
     }
   }
   if (!projectTitle || projectTitle.length < 3) {
@@ -29,16 +50,13 @@ function parseMultiSceneScript(rawText) {
 
   // 2. Detect Visual Style
   let visualStyle = 'ภาพยนตร์พรีเมียม (Macro Cinematic Commercial)';
-  const styleLine = lines.find(l => /^Visual\s*Style\s*:/i.test(l));
-  if (styleLine) {
-    visualStyle = styleLine.replace(/^Visual\s*Style\s*:\s*/i, '').trim();
+  const styleMatch = text.match(/Visual\s*Style(?:[^\n:：]*?)?[:：]\s*([^\n\r]+)/i);
+  if (styleMatch) {
+    let s = styleMatch[1].trim().replace(/(?:Scene|Shot|ฉาก).*$/i, '').trim();
+    if (s) visualStyle = s;
   }
 
   // 3. Split by Scene / Shot headers
-  // Patterns:
-  // "Scene 1: Smart Access", "Scene 1 - Smart Access", "Scene 1 Smart Access"
-  // "Shot 1: ...", "ฉากที่ 1: ...", "ฉาก 1: ...", "ช็อต 1: ..."
-  // "1. Smart Access", "1) Smart Access"
   const sceneHeaderRegex = /(?:^|\n)\s*(?:(?:Scene|Shot|ฉากที่|ฉาก|ช็อตที่|ช็อต|ซีน)\s*(\d+)[\s:：.-]*([^\n]*)|(\d+)[.)]\s*([^\n]+))/gi;
 
   const headerMatches = [];
@@ -142,20 +160,54 @@ function parseMultiSceneScript(rawText) {
         cameraMovement = 'Slow establishing dolly back';
       }
 
-      // Specific ASMR / Automotive craftsmanship mapping
-      if (lowerPrompt.includes('key') || lowerPrompt.includes('smart key') || lowerPrompt.includes('door handle') || lowerPrompt.includes('smart access') || lowerPrompt.includes('กุญแจ')) {
+      // Specific ASMR / Automotive craftsmanship mapping (Strict Priority Order)
+      // 1. EV Charging Port (Must check BEFORE generic door!)
+      if (lowerPrompt.includes('charging port') || lowerPrompt.includes('พอร์ตชาร์จ') || lowerPrompt.includes('charging flap') || lowerPrompt.includes('charge port') || lowerPrompt.includes('ชาร์จไฟ') || lowerPrompt.includes('ปลั๊กชาร์จ')) {
+        sketchTheme = 'car_ev_charging_port';
+        if (!foleyDesc) foleyDesc = 'เสียงมอเตอร์ปลดล็อกฝาพอร์ตชาร์จเปิดนุ่มนวล พร้อมเสียงสัญญาณไฟ LED (Futuristic EV Flap Opening)';
+      }
+      // 2. Panoramic Glass Sunroof (Must check BEFORE leather seats!)
+      else if (lowerPrompt.includes('sunroof') || lowerPrompt.includes('panoramic') || lowerPrompt.includes('หลังคาแก้ว') || lowerPrompt.includes('glass roof') || lowerPrompt.includes('ซันรูฟ')) {
+        sketchTheme = 'car_panoramic_sunroof';
+        if (!foleyDesc) foleyDesc = 'เสียงเลื่อนแผงหลังคากระจกบานใหญ่ เงียบสนิท ไร้แรงสั่นสะเทือน (Silky Smooth Sunroof Slide)';
+      }
+      // 3. EV Boot-up Screen / Digital Instrument Cluster
+      else if (lowerPrompt.includes('boot-up') || lowerPrompt.includes('boot up') || lowerPrompt.includes('bootup') || lowerPrompt.includes('instrument cluster') || lowerPrompt.includes('เปิดระบบ ev') || lowerPrompt.includes('wake up') || lowerPrompt.includes('waking up') || (lowerPrompt.includes('digital') && lowerPrompt.includes('dashboard')) || lowerPrompt.includes('หน้าปัด')) {
+        sketchTheme = 'car_ev_bootup_screen';
+        if (!foleyDesc) foleyDesc = 'เสียง Chime ต้อนรับระบบดิจิทัล EV คมชัด คลื่นเสียงไซไฟหรูหรา (Harmonic EV System Chime)';
+      }
+      // 4. Front Engine Hood Lift / Frunk
+      else if (lowerPrompt.includes('hood') || lowerPrompt.includes('ฝากระโปรง') || lowerPrompt.includes('front hood') || lowerPrompt.includes('lifting the front hood') || lowerPrompt.includes('mechanical joints')) {
+        sketchTheme = 'car_hood_lift';
+        if (!foleyDesc) foleyDesc = 'เสียงกลไกล็อกฝากระโปรงปลดล็อกและเสียงโช้คอัพลมดันขึ้นอย่างนุ่มนวล (Solid Hydraulic Strut Lift)';
+      }
+      // 5. Center Commander Rotary Dial (Console)
+      else if (lowerPrompt.includes('center commander') || lowerPrompt.includes('commander') || lowerPrompt.includes('แป้นควบคุม') || (lowerPrompt.includes('center console') && (lowerPrompt.includes('dial') || lowerPrompt.includes('knob') || lowerPrompt.includes('rotat')))) {
+        sketchTheme = 'car_center_commander';
+        if (!foleyDesc) foleyDesc = 'เสียงคลิกหมุนแป้นคอมมานเดอร์อลูมิเนียม แน่น ละเอียดระดับไมครอน (Tactile Rotary Dial Clicks)';
+      }
+      // 6. Smart Key Access
+      else if (lowerPrompt.includes('key') || lowerPrompt.includes('smart key') || lowerPrompt.includes('door handle') || lowerPrompt.includes('smart access') || lowerPrompt.includes('กุญแจ')) {
         sketchTheme = 'car_smart_key_door';
         if (!foleyDesc) foleyDesc = 'เสียงสัมผัสกุญแจสมาร์ทคีย์และเสียงเปิดล็อกเซ็นทรัลล็อกนุ่มนวล (Soft key click)';
-      } else if (lowerPrompt.includes('peel') || lowerPrompt.includes('unpeel') || lowerPrompt.includes('screen') || lowerPrompt.includes('film') || lowerPrompt.includes('console') || lowerPrompt.includes('ฟิล์ม') || lowerPrompt.includes('ลอก')) {
+      }
+      // 7. Protective Screen Film Peel
+      else if (lowerPrompt.includes('peel') || lowerPrompt.includes('unpeel') || lowerPrompt.includes('protective film') || (lowerPrompt.includes('film') && lowerPrompt.includes('screen')) || lowerPrompt.includes('ฟิล์ม') || lowerPrompt.includes('ลอก')) {
         sketchTheme = 'car_unpeeling_screen';
         if (!foleyDesc) foleyDesc = 'เสียงลอกแผ่นฟิล์มใส ASMR ชัดเจน กรอบแกรบสะกดใจ ชวนผ่อนคลาย (Satisfying Film Peel)';
-      } else if (lowerPrompt.includes('tactile') || lowerPrompt.includes('dial') || lowerPrompt.includes('knob') || lowerPrompt.includes('climate') || lowerPrompt.includes('control dial') || lowerPrompt.includes('ปุ่มหมุน') || lowerPrompt.includes('แอร์')) {
+      }
+      // 8. Tactile Climate AC Knob
+      else if (lowerPrompt.includes('tactile') || lowerPrompt.includes('climate control') || (lowerPrompt.includes('dial') && lowerPrompt.includes('dashboard')) || lowerPrompt.includes('control dial') || lowerPrompt.includes('ปุ่มหมุน') || lowerPrompt.includes('ปุ่มปรับแอร์') || lowerPrompt.includes('แอร์')) {
         sketchTheme = 'car_dial_knob';
         if (!foleyDesc) foleyDesc = 'เสียงคลิกหมุนปุ่มเมทัลลิก แน่น นุ่มนวล เกรดพรีเมียม (Precision Metallic Dial Click)';
-      } else if (lowerPrompt.includes('stitch') || lowerPrompt.includes('leather') || lowerPrompt.includes('steering') || lowerPrompt.includes('เย็บ') || lowerPrompt.includes('หนังแท้') || lowerPrompt.includes('พวงมาลัย')) {
+      }
+      // 9. Leather & Stitching
+      else if (lowerPrompt.includes('stitch') || lowerPrompt.includes('leather steering') || (lowerPrompt.includes('leather') && lowerPrompt.includes('steering')) || (lowerPrompt.includes('leather') && lowerPrompt.includes('wheel')) || lowerPrompt.includes('เย็บ') || lowerPrompt.includes('หนังแท้') || lowerPrompt.includes('พวงมาลัย')) {
         sketchTheme = 'car_leather_stitching';
         if (!foleyDesc) foleyDesc = 'เสียงสัมผัสลูบไล้หนังแท้เย็บมือสัมผัสนุ่มนวล (Soft Leather Grain Rustle)';
-      } else if (lowerPrompt.includes('thud') || lowerPrompt.includes('door') || lowerPrompt.includes('ประตู') || lowerPrompt.includes('ปิดประตู') || lowerPrompt.includes('solid')) {
+      }
+      // 10. Door Solid Thud
+      else if (lowerPrompt.includes('thud') || lowerPrompt.includes('door fully closed') || lowerPrompt.includes('closing') || lowerPrompt.includes('ปิดประตู') || lowerPrompt.includes('heavy, glossy') || lowerPrompt.includes('solid thud')) {
         sketchTheme = 'car_door_thud';
         if (!foleyDesc) foleyDesc = 'เสียงประตูปิด "ตึ้บ" ทุ้มแน่น หนักแน่น ไร้เสียงสะท้อน (Acoustic Solid Thud)';
       }

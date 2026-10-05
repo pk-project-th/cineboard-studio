@@ -71,19 +71,53 @@ function resolveSketchTheme(shot) {
 
   if (isCar) {
     // Specific High-Priority ASMR & Craftsmanship Scenes
+    // 1. EV Charging Port (Must check BEFORE generic door!)
+    if (allText.includes('charging port') || allText.includes('พอร์ตชาร์จ') || allText.includes('charging flap') || allText.includes('charge port') || allText.includes('ชาร์จไฟ') || allText.includes('ปลั๊กชาร์จ')) {
+      return 'car_ev_charging_port';
+    }
+
+    // 2. Panoramic Glass Sunroof (Must check BEFORE leather seats!)
+    if (allText.includes('sunroof') || allText.includes('panoramic') || allText.includes('หลังคาแก้ว') || allText.includes('glass roof') || allText.includes('ซันรูฟ')) {
+      return 'car_panoramic_sunroof';
+    }
+
+    // 3. EV Boot-up Screen / Digital Instrument Cluster
+    if (allText.includes('boot-up') || allText.includes('boot up') || allText.includes('bootup') || allText.includes('instrument cluster') || allText.includes('เปิดระบบ ev') || allText.includes('wake up') || allText.includes('waking up') || (allText.includes('digital') && allText.includes('dashboard')) || allText.includes('หน้าปัด')) {
+      return 'car_ev_bootup_screen';
+    }
+
+    // 4. Front Engine Hood Lift / Frunk
+    if (allText.includes('hood') || allText.includes('ฝากระโปรง') || allText.includes('front hood') || allText.includes('lifting the front hood') || allText.includes('mechanical joints')) {
+      return 'car_hood_lift';
+    }
+
+    // 5. Center Commander Rotary Dial (Console)
+    if (allText.includes('center commander') || allText.includes('commander') || allText.includes('แป้นควบคุม') || (allText.includes('center console') && (allText.includes('dial') || allText.includes('knob') || allText.includes('rotat')))) {
+      return 'car_center_commander';
+    }
+
+    // 6. Smart Key Access
     if (allText.includes('smart key') || allText.includes('smart access') || (allText.includes('key') && (allText.includes('door') || allText.includes('handle'))) || (allText.includes('กุญแจ') && allText.includes('ประตู'))) {
       return 'car_smart_key_door';
     }
-    if (allText.includes('unpeel') || allText.includes('peel') || allText.includes('protective film') || (allText.includes('film') && allText.includes('screen')) || allText.includes('ฟิล์ม') || allText.includes('ลอกฟิล์ม') || allText.includes('center console')) {
+
+    // 7. Protective Screen Film Peel
+    if (allText.includes('unpeel') || allText.includes('peel') || allText.includes('protective film') || (allText.includes('film') && allText.includes('screen')) || allText.includes('ฟิล์ม') || allText.includes('ลอกฟิล์ม')) {
       return 'car_unpeeling_screen';
     }
-    if (allText.includes('tactile') || allText.includes('climate control') || (allText.includes('dial') && allText.includes('dashboard')) || allText.includes('control dial') || allText.includes('ปุ่มหมุน') || allText.includes('ปุ่มแอร์')) {
+
+    // 8. Tactile Climate AC Knob
+    if (allText.includes('tactile') || allText.includes('climate control') || (allText.includes('dial') && allText.includes('dashboard')) || allText.includes('control dial') || allText.includes('ปุ่มหมุน') || allText.includes('ปุ่มปรับแอร์') || allText.includes('ปุ่มแอร์')) {
       return 'car_dial_knob';
     }
-    if (allText.includes('stitching') || allText.includes('stitch') || allText.includes('leather') || allText.includes('craftsmanship') || allText.includes('เย็บ') || allText.includes('หนังแท้')) {
+
+    // 9. Leather & Stitching (Steering wheel)
+    if (allText.includes('stitching') || allText.includes('stitch') || allText.includes('leather steering') || (allText.includes('leather') && allText.includes('steering')) || (allText.includes('leather') && allText.includes('wheel')) || allText.includes('craftsmanship') || allText.includes('เย็บ') || allText.includes('หนังแท้') || allText.includes('พวงมาลัย')) {
       return 'car_leather_stitching';
     }
-    if (allText.includes('thud') || (allText.includes('door') && allText.includes('push')) || (allText.includes('door') && allText.includes('closed')) || allText.includes('ปิดประตู') || allText.includes('suv car door')) {
+
+    // 10. Door Solid Thud
+    if (allText.includes('thud') || (allText.includes('door') && allText.includes('push')) || (allText.includes('door') && allText.includes('closed')) || allText.includes('ปิดประตู') || allText.includes('suv car door') || allText.includes('solid thud')) {
       return 'car_door_thud';
     }
 
@@ -813,6 +847,180 @@ function renderSimpleIllustration(theme) {
         <g transform="translate(384, 875)">
           <rect x="-240" y="-22" width="480" height="44" rx="22" fill="#ef4444" opacity="0.18" stroke="#ef4444" stroke-width="1.5"/>
           <text x="0" y="6" font-family="sans-serif" font-size="16" font-weight="900" fill="#ef4444" text-anchor="middle">THE SOLID "THUD" (ACOUSTIC CLOSE)</text>
+        </g>
+      `;
+
+    // 7.6 EV CHARGING PORT (CLEAN ENERGY)
+    case 'car_ev_charging_port':
+      return `
+        <rect x="100" y="240" width="568" height="540" rx="24" fill="#090d16" stroke="#334155" stroke-width="3"/>
+        <path d="M 100 320 Q 384 300 668 340 L 668 760 L 100 760 Z" fill="#111827" stroke="#334155" stroke-width="3"/>
+        <path d="M 100 480 Q 280 460 400 490" stroke="#38bdf8" stroke-width="2" opacity="0.4" fill="none"/>
+        <g transform="translate(350, 490)">
+          <ellipse cx="0" cy="0" rx="100" ry="85" fill="#030712" stroke="#475569" stroke-width="4"/>
+          <circle cx="0" cy="0" r="70" fill="none" stroke="#38bdf8" stroke-width="5" stroke-dasharray="16 8"/>
+          <circle cx="0" cy="0" r="56" fill="#0f172a" stroke="#0ea5e9" stroke-width="2"/>
+          <circle cx="-20" cy="-20" r="10" fill="#1e293b" stroke="#38bdf8" stroke-width="2"/>
+          <circle cx="20" cy="-20" r="10" fill="#1e293b" stroke="#38bdf8" stroke-width="2"/>
+          <circle cx="0" cy="-3" r="9" fill="#1e293b" stroke="#38bdf8" stroke-width="2"/>
+          <circle cx="-24" cy="18" r="9" fill="#1e293b" stroke="#38bdf8" stroke-width="2"/>
+          <circle cx="24" cy="18" r="9" fill="#1e293b" stroke="#38bdf8" stroke-width="2"/>
+          <ellipse cx="-16" cy="38" rx="7" ry="6" fill="#facc15" stroke="#ca8a04" stroke-width="1.5"/>
+          <ellipse cx="16" cy="38" rx="7" ry="6" fill="#facc15" stroke="#ca8a04" stroke-width="1.5"/>
+          <circle cx="0" cy="-45" r="5" fill="#22c55e" stroke="#15803d" stroke-width="1"/>
+          <text x="0" y="-55" font-family="monospace" font-size="11" font-weight="900" fill="#22c55e" text-anchor="middle">⚡ READY</text>
+        </g>
+        <g transform="translate(430, 410) rotate(-28)">
+          <rect x="0" y="0" width="130" height="150" rx="18" fill="#1f2937" stroke="#38bdf8" stroke-width="3.5"/>
+          <rect x="10" y="10" width="110" height="130" rx="12" fill="#111827" opacity="0.6"/>
+          <path d="M 20 40 L 90 20" stroke="#facc15" stroke-width="2" opacity="0.5"/>
+        </g>
+        <g transform="translate(520, 480)">
+          <ellipse cx="20" cy="0" rx="30" ry="18" fill="#334155" stroke="#f8fafc" stroke-width="2.5"/>
+          <path d="M 40 10 L 100 50 L 120 20 L 50 -10 Z" fill="#1e293b"/>
+          <path d="M -15 -10 Q -25 0 -15 10" stroke="#38bdf8" stroke-width="3" fill="none"/>
+        </g>
+        <g transform="translate(384, 875)">
+          <rect x="-240" y="-22" width="480" height="44" rx="22" fill="#38bdf8" opacity="0.18" stroke="#38bdf8" stroke-width="1.5"/>
+          <text x="0" y="6" font-family="sans-serif" font-size="16" font-weight="900" fill="#38bdf8" text-anchor="middle">EV CHARGING PORT (CLEAN ENERGY)</text>
+        </g>
+      `;
+
+    // 7.7 FRONT HOOD LIFT (SOLID MECHANICAL JOINTS)
+    case 'car_hood_lift':
+      return `
+        <rect x="100" y="240" width="568" height="540" rx="24" fill="#0b0e14" stroke="#334155" stroke-width="3"/>
+        <path d="M 130 680 L 638 680 L 610 560 L 158 560 Z" fill="#131a26" stroke="#475569" stroke-width="3"/>
+        <g transform="translate(384, 620)">
+          <rect x="-180" y="-25" width="360" height="50" rx="8" fill="#090d16" stroke="#334155" stroke-width="2"/>
+          <line x1="-140" y1="-25" x2="-140" y2="25" stroke="#475569" stroke-width="3"/>
+          <line x1="-100" y1="-25" x2="-100" y2="25" stroke="#475569" stroke-width="3"/>
+          <line x1="-60" y1="-25" x2="-60" y2="25" stroke="#475569" stroke-width="3"/>
+          <line x1="-20" y1="-25" x2="-20" y2="25" stroke="#475569" stroke-width="3"/>
+          <line x1="20" y1="-25" x2="20" y2="25" stroke="#475569" stroke-width="3"/>
+          <line x1="60" y1="-25" x2="60" y2="25" stroke="#475569" stroke-width="3"/>
+          <line x1="100" y1="-25" x2="100" y2="25" stroke="#475569" stroke-width="3"/>
+          <line x1="140" y1="-25" x2="140" y2="25" stroke="#475569" stroke-width="3"/>
+        </g>
+        <polygon points="140,570 210,565 200,580 145,582" fill="#ccff00"/>
+        <polygon points="628,570 558,565 568,580 623,582" fill="#ccff00"/>
+        <polygon points="158,555 610,555 580,330 190,330" fill="#1e293b" stroke="#94a3b8" stroke-width="4"/>
+        <polygon points="180,535 588,535 560,350 208,350" fill="#111827" opacity="0.6"/>
+        <line x1="220" y1="550" x2="245" y2="390" stroke="#f8fafc" stroke-width="5"/>
+        <circle cx="220" cy="550" r="7" fill="#64748b" stroke="#ffffff" stroke-width="2"/>
+        <circle cx="245" cy="390" r="7" fill="#64748b" stroke="#ffffff" stroke-width="2"/>
+        <line x1="548" y1="550" x2="523" y2="390" stroke="#f8fafc" stroke-width="5"/>
+        <circle cx="548" cy="550" r="7" fill="#64748b" stroke="#ffffff" stroke-width="2"/>
+        <circle cx="523" cy="390" r="7" fill="#64748b" stroke="#ffffff" stroke-width="2"/>
+        <g transform="translate(384, 335)">
+          <ellipse cx="0" cy="0" rx="36" ry="20" fill="#334155" stroke="#f8fafc" stroke-width="3"/>
+          <path d="M -15 15 L -25 70 L 25 70 L 15 15 Z" fill="#1e293b"/>
+          <path d="M 0 -20 L 0 -45 M -12 -35 L 0 -48 L 12 -35" stroke="#ccff00" stroke-width="3.5" fill="none"/>
+          <text x="0" y="-55" font-family="monospace" font-size="12" font-weight="900" fill="#ccff00" text-anchor="middle">SOLID LIFT</text>
+        </g>
+        <g transform="translate(384, 875)">
+          <rect x="-240" y="-22" width="480" height="44" rx="22" fill="#facc15" opacity="0.18" stroke="#facc15" stroke-width="1.5"/>
+          <text x="0" y="6" font-family="sans-serif" font-size="16" font-weight="900" fill="#facc15" text-anchor="middle">ENGINE HOOD LIFT (SOLID JOINTS)</text>
+        </g>
+      `;
+
+    // 7.8 CENTER COMMANDER (TACTILE ROTARY CONTROLLER)
+    case 'car_center_commander':
+      return `
+        <rect x="100" y="240" width="568" height="540" rx="24" fill="#0d0f17" stroke="#334155" stroke-width="3"/>
+        <rect x="150" y="290" width="468" height="440" rx="28" fill="#141824" stroke="#475569" stroke-width="3"/>
+        <rect x="175" y="315" width="418" height="390" rx="20" fill="#0b0e17" stroke="#1e293b" stroke-width="2"/>
+        <rect x="200" y="340" width="90" height="46" rx="10" fill="#1e2538" stroke="#64748b" stroke-width="1.5"/>
+        <text x="245" y="368" font-family="sans-serif" font-size="12" font-weight="bold" fill="#94a3b8" text-anchor="middle">NAV</text>
+        <rect x="478" y="340" width="90" height="46" rx="10" fill="#1e2538" stroke="#64748b" stroke-width="1.5"/>
+        <text x="523" y="368" font-family="sans-serif" font-size="12" font-weight="bold" fill="#94a3b8" text-anchor="middle">MEDIA</text>
+        <rect x="200" y="630" width="90" height="46" rx="10" fill="#1e2538" stroke="#64748b" stroke-width="1.5"/>
+        <text x="245" y="658" font-family="sans-serif" font-size="12" font-weight="bold" fill="#94a3b8" text-anchor="middle">BACK</text>
+        <rect x="478" y="630" width="90" height="46" rx="10" fill="#1e2538" stroke="#64748b" stroke-width="1.5"/>
+        <text x="523" y="658" font-family="sans-serif" font-size="12" font-weight="bold" fill="#94a3b8" text-anchor="middle">FAV</text>
+        <g transform="translate(384, 505)">
+          <circle cx="0" cy="0" r="125" fill="#38bdf8" opacity="0.1"/>
+          <circle cx="0" cy="0" r="115" stroke="#64748b" stroke-width="8" stroke-dasharray="10 6" fill="#1c2333"/>
+          <circle cx="0" cy="0" r="102" fill="#334155" stroke="#cbd5e1" stroke-width="4"/>
+          <circle cx="0" cy="0" r="85" fill="#090d16" stroke="#facc15" stroke-width="2.5"/>
+          <circle cx="0" cy="0" r="70" fill="#111827" stroke="#38bdf8" stroke-width="1.5" stroke-dasharray="6 4"/>
+          <path d="M -50 -50 A 70 70 0 0 1 50 -50" stroke="#ccff00" stroke-width="3.5" fill="none"/>
+          <polygon points="52,-57 58,-45 44,-47" fill="#ccff00"/>
+          <path d="M 50 50 A 70 70 0 0 1 -50 50" stroke="#ccff00" stroke-width="3.5" fill="none"/>
+          <polygon points="-52,57 -58,45 -44,47" fill="#ccff00"/>
+          <text x="0" y="5" font-family="monospace" font-size="11" font-weight="900" fill="#facc15" text-anchor="middle">*TACTILE CLICK*</text>
+          <g transform="translate(35, 10) rotate(-15)">
+            <ellipse cx="20" cy="0" rx="38" ry="22" fill="#334155" stroke="#f8fafc" stroke-width="3"/>
+            <path d="M 45 10 L 95 65 L 125 45 L 65 -5 Z" fill="#1e293b"/>
+          </g>
+        </g>
+        <g transform="translate(384, 875)">
+          <rect x="-240" y="-22" width="480" height="44" rx="22" fill="#facc15" opacity="0.18" stroke="#facc15" stroke-width="1.5"/>
+          <text x="0" y="6" font-family="sans-serif" font-size="16" font-weight="900" fill="#facc15" text-anchor="middle">CENTER COMMANDER (TACTILE ROTARY)</text>
+        </g>
+      `;
+
+    // 7.9 PANORAMIC GLASS SUNROOF (OPEN BLUE SKY)
+    case 'car_panoramic_sunroof':
+      return `
+        <rect x="100" y="240" width="568" height="540" rx="24" fill="#080c14" stroke="#334155" stroke-width="3"/>
+        <rect x="140" y="270" width="488" height="480" rx="32" fill="#111726" stroke="#1e293b" stroke-width="4"/>
+        <g transform="translate(184, 300)">
+          <rect x="0" y="0" width="400" height="320" rx="22" fill="#0284c7" stroke="#38bdf8" stroke-width="3"/>
+          <circle cx="80" cy="100" r="45" fill="#ffffff" opacity="0.85"/>
+          <circle cx="120" cy="90" r="55" fill="#ffffff" opacity="0.95"/>
+          <circle cx="165" cy="105" r="40" fill="#ffffff" opacity="0.85"/>
+          <circle cx="300" cy="140" r="35" fill="#ffffff" opacity="0.8"/>
+          <circle cx="335" cy="135" r="45" fill="#ffffff" opacity="0.9"/>
+          <circle cx="340" cy="45" r="28" fill="#fef08a" stroke="#facc15" stroke-width="3"/>
+          <polygon points="340,55 360,55 400,320 280,320" fill="#fef08a" opacity="0.25"/>
+          <rect x="0" y="0" width="400" height="15" fill="#0f172a" stroke="#334155" stroke-width="1.5"/>
+          <rect x="0" y="305" width="400" height="15" fill="#0f172a" stroke="#334155" stroke-width="1.5"/>
+          <line x1="220" y1="0" x2="220" y2="320" stroke="#0f172a" stroke-width="8"/>
+          <line x1="216" y1="0" x2="216" y2="320" stroke="#38bdf8" stroke-width="3"/>
+          <text x="110" y="295" font-family="monospace" font-size="12" font-weight="bold" fill="#ffffff">*PANORAMIC OPEN*</text>
+        </g>
+        <ellipse cx="270" cy="710" rx="65" ry="50" fill="#0a0e17" stroke="#334155" stroke-width="3"/>
+        <ellipse cx="498" cy="710" rx="65" ry="50" fill="#0a0e17" stroke="#334155" stroke-width="3"/>
+        <g transform="translate(384, 875)">
+          <rect x="-240" y="-22" width="480" height="44" rx="22" fill="#38bdf8" opacity="0.18" stroke="#38bdf8" stroke-width="1.5"/>
+          <text x="0" y="6" font-family="sans-serif" font-size="16" font-weight="900" fill="#38bdf8" text-anchor="middle">PANORAMIC GLASS SUNROOF (OPEN SKY)</text>
+        </g>
+      `;
+
+    // 7.10 EV BOOT-UP SCREEN (DIGITAL COCKPIT CLUSTER)
+    case 'car_ev_bootup_screen':
+      return `
+        <rect x="100" y="240" width="568" height="540" rx="24" fill="#05070c" stroke="#334155" stroke-width="3"/>
+        <g transform="translate(134, 320)">
+          <rect x="0" y="0" width="500" height="280" rx="24" fill="#090d16" stroke="#38bdf8" stroke-width="4"/>
+          <rect x="12" y="12" width="476" height="256" rx="16" fill="#030712"/>
+          <line x1="40" y1="20" x2="460" y2="20" stroke="#06b6d4" stroke-width="2.5" opacity="0.8"/>
+          <text x="250" y="42" font-family="monospace" font-size="12" font-weight="900" fill="#06b6d4" text-anchor="middle">EV SYSTEM BOOT • READY</text>
+          <g transform="translate(110, 140)">
+            <circle cx="0" cy="0" r="65" fill="none" stroke="#1e293b" stroke-width="8"/>
+            <path d="M -55 35 A 65 65 0 1 1 55 35" fill="none" stroke="#38bdf8" stroke-width="8" stroke-dasharray="16 4"/>
+            <text x="0" y="10" font-family="monospace" font-size="36" font-weight="900" fill="#ffffff" text-anchor="middle">0</text>
+            <text x="0" y="30" font-family="sans-serif" font-size="10" font-weight="bold" fill="#94a3b8" text-anchor="middle">KM/H</text>
+          </g>
+          <g transform="translate(250, 145)">
+            <ellipse cx="0" cy="0" rx="35" ry="60" fill="#082f49" stroke="#38bdf8" stroke-width="2.5"/>
+            <ellipse cx="0" cy="-5" rx="22" ry="32" fill="#0c4a6e" stroke="#7dd3fc" stroke-width="1.5"/>
+            <line x1="-30" y1="-50" x2="30" y2="-50" stroke="#ccff00" stroke-width="3"/>
+            <line x1="-30" y1="50" x2="30" y2="50" stroke="#ef4444" stroke-width="3"/>
+            <text x="0" y="78" font-family="monospace" font-size="11" font-weight="900" fill="#ccff00" text-anchor="middle">DRIVE READY</text>
+          </g>
+          <g transform="translate(390, 140)">
+            <circle cx="0" cy="0" r="65" fill="none" stroke="#1e293b" stroke-width="8"/>
+            <path d="M -55 35 A 65 65 0 1 1 55 35" fill="none" stroke="#22c55e" stroke-width="8"/>
+            <text x="0" y="5" font-family="monospace" font-size="28" font-weight="900" fill="#22c55e" text-anchor="middle">98%</text>
+            <text x="0" y="24" font-family="monospace" font-size="10" font-weight="bold" fill="#ffffff" text-anchor="middle">520 KM</text>
+            <text x="0" y="40" font-family="sans-serif" font-size="9" font-weight="bold" fill="#94a3b8" text-anchor="middle">BATTERY</text>
+          </g>
+        </g>
+        <g transform="translate(384, 875)">
+          <rect x="-240" y="-22" width="480" height="44" rx="22" fill="#22c55e" opacity="0.18" stroke="#22c55e" stroke-width="1.5"/>
+          <text x="0" y="6" font-family="sans-serif" font-size="16" font-weight="900" fill="#22c55e" text-anchor="middle">EV BOOT-UP SCREEN (DIGITAL CLUSTER)</text>
         </g>
       `;
 

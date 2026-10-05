@@ -36,6 +36,7 @@ export default function FloatingPromptBar({
   const [shotCount, setShotCount] = useState(5);
   const [isGenerating, setIsGenerating] = useState(false);
   const [statusMsg, setStatusMsg] = useState('');
+  const [isCollapsed, setIsCollapsed] = useState(false);
 
   const detectedScript = useMemo(() => {
     return parseMultiSceneScript(promptText);
@@ -385,6 +386,26 @@ export default function FloatingPromptBar({
     }
   };
 
+  if (isCollapsed) {
+    return (
+      <div className="relative w-full z-30 pointer-events-auto select-none flex justify-center pb-1">
+        <button
+          onClick={() => setIsCollapsed(false)}
+          className="flex items-center gap-2.5 px-4 py-2 rounded-full bg-white/95 backdrop-blur-xl border border-stone-300 hover:border-[#F71C25] text-stone-900 shadow-xl shadow-stone-900/10 hover:shadow-2xl text-xs font-bold transition-all cursor-pointer group active:scale-95"
+          title="คลิกเพื่อเปิดขยายช่องพิมพ์ Prompt & สตอรี่บอร์ด"
+        >
+          <span className="w-2 h-2 rounded-full bg-[#F71C25] animate-pulse flex-shrink-0" />
+          <span className="truncate max-w-[200px] sm:max-w-md text-stone-700 group-hover:text-stone-950 font-medium">
+            💬 {promptText ? promptText.slice(0, 36) + '...' : (activeSeries ? activeSeries.title : 'พิมพ์ Prompt / บทสตอรี่บอร์ด')}
+          </span>
+          <span className="flex items-center gap-1 text-[11px] font-mono text-[#F71C25] font-extrabold bg-red-50 px-2 py-0.5 rounded-full border border-red-200 ml-1">
+            ขยายแถบ ▴
+          </span>
+        </button>
+      </div>
+    );
+  }
+
   return (
     <div className="relative w-full z-30 pointer-events-auto select-none transition-all duration-300">
       <div className="bg-white/95 backdrop-blur-2xl border border-stone-200/90 rounded-2xl p-3 sm:p-3.5 shadow-xl shadow-stone-300/30 ring-1 ring-stone-900/5">
@@ -398,24 +419,36 @@ export default function FloatingPromptBar({
           className="hidden"
         />
 
-        {/* Top: Active Project Bar & Instant Start New Project Button */}
+        {/* Top: Active Project Bar, Start New Project & Minimize Button */}
         <div className="flex items-center justify-between gap-2 px-1 pb-2 mb-2 border-b border-stone-100 text-xs">
           <div className="flex items-center gap-2 min-w-0">
             <span className="w-2 h-2 rounded-full bg-[#F71C25] animate-pulse flex-shrink-0" />
             <span className="text-stone-500 font-mono text-[11px] flex-shrink-0">โปรเจกต์ที่เลือก:</span>
-            <span className="font-bold text-stone-900 truncate max-w-[200px] sm:max-w-xs" title={activeSeries ? activeSeries.title : 'รวมทุกโปรเจกต์'}>
+            <span className="font-bold text-stone-900 truncate max-w-[160px] sm:max-w-xs" title={activeSeries ? activeSeries.title : 'รวมทุกโปรเจกต์'}>
               {activeSeries ? `📁 ${activeSeries.title} (${activeSeries.shot_count ?? 0} ช็อต)` : `🎬 รวมทุกโปรเจกต์ (${seriesList.reduce((acc, cur) => acc + (cur.shot_count || 0), 0)} ช็อต)`}
             </span>
           </div>
 
-          <button
-            onClick={onStartNewProject}
-            className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-gradient-to-r from-[#F71C25] to-[#FF4438] hover:from-[#E0141D] hover:to-[#E02D24] text-white font-bold text-xs shadow-sm shadow-red-500/20 active:scale-95 transition-all cursor-pointer flex-shrink-0"
-            title="กดเพื่อเริ่มโปรเจกต์ใหม่ทันที แยกบอร์ดออกเป็นอิสระ"
-          >
-            <Sparkles className="w-3.5 h-3.5 fill-current" />
-            <span>+ เริ่มโปรเจกต์ใหม่</span>
-          </button>
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <button
+              onClick={onStartNewProject}
+              className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-gradient-to-r from-[#F71C25] to-[#FF4438] hover:from-[#E0141D] hover:to-[#E02D24] text-white font-bold text-xs shadow-sm shadow-red-500/20 active:scale-95 transition-all cursor-pointer"
+              title="กดเพื่อเริ่มโปรเจกต์ใหม่ทันที แยกบอร์ดออกเป็นอิสระ"
+            >
+              <Sparkles className="w-3.5 h-3.5 fill-current" />
+              <span>+ เริ่มโปรเจกต์ใหม่</span>
+            </button>
+
+            {/* Minimize / Collapse Bar Button */}
+            <button
+              onClick={() => setIsCollapsed(true)}
+              className="flex items-center gap-1 px-2.5 py-1 rounded-xl bg-stone-100 hover:bg-stone-200 text-stone-600 hover:text-stone-900 font-bold text-xs transition-colors cursor-pointer"
+              title="ย่อแถบพิมพ์ลง เพื่อดูภาพสตอรี่บอร์ดได้อย่างเต็มตา"
+            >
+              <ChevronDown className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">ย่อแถบ</span>
+            </button>
+          </div>
         </div>
 
         {/* Actions Bar (Groq AI, Attach Image, Quick Presets) */}
@@ -537,7 +570,17 @@ export default function FloatingPromptBar({
               </span>
             </div>
             <div className="flex items-center gap-2 flex-shrink-0 ml-2">
-              <span className="text-[10px] font-mono font-bold text-emerald-800 bg-white px-2 py-0.5 rounded border border-emerald-300">
+              <button
+                type="button"
+                onClick={() => {
+                  if (onOpenScriptImporter) onOpenScriptImporter(promptText);
+                }}
+                className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs shadow-xs cursor-pointer transition-colors"
+                title="เปิดหน้าต่างแก้ไขและตรวจสอบ Prompt ทั้งหมดก่อนสร้างเป็นช็อต"
+              >
+                <span>✏️ แก้ไข Prompt ก่อนแตกช็อต</span>
+              </button>
+              <span className="hidden sm:inline-block text-[10px] font-mono font-bold text-emerald-800 bg-white px-2 py-0.5 rounded border border-emerald-300">
                 พร้อมสร้าง {detectedScript.shots.length} ช็อต
               </span>
             </div>
