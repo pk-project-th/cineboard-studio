@@ -1,13 +1,16 @@
 import { generateMasterProductionPrompt } from '../utils/masterPromptHelper';
 import MasterPromptModal from './MasterPromptModal';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   X, Sparkles, Film, Video, Check, Layers, ChevronRight, ChevronLeft,
   User, Mountain, Package, Eye, ArrowRight, RefreshCw,
-  Plus, Trash2, Sliders, Play, Camera, Copy, Volume2, Type, Clapperboard, Clock, Timer, Zap
+  Plus, Trash2, Sliders, Play, Camera, Copy, Volume2, Type, Clapperboard, Clock, Timer, Zap,
+  FileText, CheckCircle2
 } from 'lucide-react';
 import CameraAngleSelector, { CAMERA_ANGLES } from './CameraAngleSelector';
 import confetti from 'canvas-confetti';
+import { parseMultiSceneScript } from '../utils/scriptParser';
+import { SAMPLE_ASMR_SCRIPT } from './ScriptImportModal';
 
 export default function StoryboardBuilderModal({
   isOpen,
@@ -119,10 +122,35 @@ export default function StoryboardBuilderModal({
     }
   }, [isOpen]);
 
-  // Step 1 -> Call AI Director to plan Storyboard
+  useEffect(() => {
+    if (initialConcept) {
+      setConcept(initialConcept);
+    }
+  }, [initialConcept]);
+
+  // Step 1 -> Call AI Director or parse script directly
   const handleGeneratePlan = async () => {
     if (!concept.trim()) {
       alert('กรุณาระบุพล็อตเรื่องหรือคอนเซปต์');
+      return;
+    }
+
+    // Direct Offline Multi-Scene Script Parser
+    const parsedScript = parseMultiSceneScript(concept);
+    if (parsedScript && parsedScript.shots && parsedScript.shots.length >= 2) {
+      setPlannedData({
+        project_title: parsedScript.project_title,
+        logline: `สตอรี่บอร์ด ${parsedScript.shots.length} ฉาก จากบทสคริปต์ (${parsedScript.visual_style})`,
+        total_shots: parsedScript.shots.length,
+        total_scenes: parsedScript.shots.length,
+        target_duration: parsedScript.total_duration,
+        total_duration: parsedScript.total_duration,
+        pacing: pacing,
+        shots: parsedScript.shots
+      });
+      setStep(2);
+      setActiveShotIndex(0);
+      confetti({ particleCount: 40, spread: 70 });
       return;
     }
 
@@ -275,6 +303,7 @@ export default function StoryboardBuilderModal({
                 <div className="flex items-center gap-1.5 flex-wrap pt-1">
                   <span className="text-[11px] font-mono text-stone-500">ไอเดียยอดนิยม:</span>
                   {[
+                    { label: '🎬 ASMR งานประกอบญี่ปุ่น (5 ฉาก)', text: SAMPLE_ASMR_SCRIPT },
                     { label: '🙏 เที่ยววัด & ไหว้พระสงบใจ', text: 'ขอสตอรี่บอร์ดในการไปเที่ยววัด จะทำคอนเท้นอย่างไรให้น่าสนใจ สัมผัสความสงบ สถาปัตยกรรม และวิถีไทย' },
                     { label: '🚗 รถมือสองสภาพนางฟ้า', text: 'โฆษณาเต็นท์รถมือสองสภาพนางฟ้า ชูจุดเด่นตรวจสภาพ 200 จุด ผ่อนสบายพร้อมขับ' },
                     { label: '✨ เซรั่มหน้าใสผิวฉ่ำโกลว์', text: 'โฆษณาเซรั่มบำรุงผิวหน้าเข้มข้น ลดรอยสิว เผยผิวฉ่ำวาวอิ่มน้ำ Glass Skin ใน 7 วัน' },

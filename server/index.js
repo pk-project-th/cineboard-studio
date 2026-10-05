@@ -1570,8 +1570,28 @@ app.post('/api/storyboard/ai-plan', async (req, res) => {
 
     let planData = null;
 
-    // For smaller shot counts (<= 8), query Groq LPU directly for creative nuance
-    if (requestedShots <= 8 && config.GROQ_API_KEY) {
+    // 0. Priority: Check if user pasted a structured multi-scene script (Scene 1..N, ฉากที่ 1..N)
+    const { parseMultiSceneScript } = require('./scriptParser');
+    const parsedScript = parseMultiSceneScript(story_concept);
+    if (parsedScript && parsedScript.shots && parsedScript.shots.length >= 2) {
+      console.log(`[Script Parser] Directly detected ${parsedScript.shots.length} structured scenes from prompt. Zero-LLM direct mapping!`);
+      planData = {
+        project_title: parsedScript.project_title,
+        logline: `สตอรี่บอร์ด ${parsedScript.shots.length} ฉาก จากบทสคริปต์ (${parsedScript.visual_style})`,
+        total_shots: parsedScript.shots.length,
+        total_scenes: parsedScript.shots.length,
+        target_duration: parsedScript.total_duration,
+        total_duration: parsedScript.total_duration,
+        pacing: pacing,
+        shots: parsedScript.shots.map(s => ({
+          ...s,
+          image_url: getStoryboardSketch(s)
+        }))
+      };
+    }
+
+    // For smaller shot counts (<= 8), query Groq LPU directly for creative nuance (if not already parsed from script)
+    if (!planData && requestedShots <= 8 && config.GROQ_API_KEY) {
       const systemPrompt = `คุณคือผู้กำกับภาพยนตร์และผู้กำกับโฆษณามืออาชีพ (AI Storyboard & Video Director)
 หน้าที่ของคุณคือรับพล็อตเรื่อง และองค์ประกอบที่แนบมา (ตัวละคร, ฉาก, สินค้า) แล้ววางโครงสร้างสตอรี่บอร์ดจำนวน ${requestedShots} ช็อต
 โดยต้องระบุทั้ง:

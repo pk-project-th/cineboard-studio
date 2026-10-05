@@ -1,10 +1,12 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
   Sparkles, Image as ImageIcon, Plus, ChevronDown, Check,
   Sliders, Maximize2, Layers, Cpu, Flame, Play, AlertCircle,
-  Zap, ShieldCheck, Paperclip, X, Upload, Loader2, Eye
+  Zap, ShieldCheck, Paperclip, X, Upload, Loader2, Eye,
+  FileText, CheckCircle2
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
+import { parseMultiSceneScript } from '../utils/scriptParser';
 
 const MODELS = [
   { id: 'gemini-image', name: 'Gemini 3.1 Flash-Lite Image', provider: 'Google AI', badge: 'Active' },
@@ -19,6 +21,7 @@ export default function FloatingPromptBar({
   selectedItem,
   onQuickSelectPrompt,
   onOpenGroqModal,
+  onOpenScriptImporter,
   customPromptSeed,
   selectedSeriesId = 'all',
   seriesList = [],
@@ -30,8 +33,13 @@ export default function FloatingPromptBar({
   );
   const [selectedModelIdx, setSelectedModelIdx] = useState(0);
   const [aspectRatio, setAspectRatio] = useState('9:16');
+  const [shotCount, setShotCount] = useState(5);
   const [isGenerating, setIsGenerating] = useState(false);
   const [statusMsg, setStatusMsg] = useState('');
+
+  const detectedScript = useMemo(() => {
+    return parseMultiSceneScript(promptText);
+  }, [promptText]);
 
   const activeSeries = seriesList.find(s => s.id === selectedSeriesId);
 
@@ -156,7 +164,54 @@ export default function FloatingPromptBar({
     }
 
     setIsGenerating(true);
-    setStatusMsg('🎬 ผู้กำกับ AI กำลังวางสตอรี่บอร์ดเรื่องใหม่ คัดเลือกมุมกล้อง และสร้างชุดช็อต...');
+
+    // Case A: User pasted a structured script with 2+ scenes
+    if (detectedScript && detectedScript.shots && detectedScript.shots.length >= 2) {
+      setStatusMsg(`🎬 ตรวจพบสคริปต์ ${detectedScript.shots.length} ฉาก กำลังแปลงเป็นสตอรี่บอร์ดทันที...`);
+      try {
+        const commitRes = await fetch('/api/storyboard/commit-shots', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            shots: detectedScript.shots,
+            project_title: detectedScript.project_title,
+            visual_style: detectedScript.visual_style,
+            target_duration: detectedScript.total_duration
+          })
+        });
+
+        const commitData = await commitRes.json();
+        if (commitData.success && commitData.data) {
+          confetti({
+            particleCount: 65,
+            spread: 85,
+            origin: { y: 0.8 },
+            colors: ['#F71C25', '#bef264', '#ffffff']
+          });
+
+          setStatusMsg(`🎉 สร้างโปรเจกต์ใหม่ "${detectedScript.project_title}" (${commitData.data.length} ช็อต) สำเร็จแล้ว!`);
+          if (onStoryboardCommitted) {
+            onStoryboardCommitted({
+              series_id: commitData.series_id,
+              project_title: detectedScript.project_title,
+              data: commitData.data
+            });
+          }
+        } else {
+          alert(commitData.error || 'นำเข้าสตอรี่บอร์ดไม่สำเร็จ');
+        }
+      } catch (err) {
+        console.error(err);
+        alert('เกิดข้อผิดพลาดในการสร้างสตอรี่บอร์ด: ' + err.message);
+      } finally {
+        setIsGenerating(false);
+        setTimeout(() => setStatusMsg(''), 4000);
+      }
+      return;
+    }
+
+    // Case B: Freeform concept -> generate via ai-plan using chosen shot count
+    setStatusMsg(`🎬 ผู้กำกับ AI กำลังวางสตอรี่บอร์ด ${shotCount} ช็อต คัดเลือกมุมกล้อง และสร้างชุดช็อต...`);
 
     try {
       // 1. Plan shots via ai-plan
@@ -165,7 +220,7 @@ export default function FloatingPromptBar({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           story_concept: promptText,
-          num_shots: 4,
+          num_shots: shotCount,
           style: 'sketch',
           visual_style: 'sketch'
         })
@@ -176,7 +231,7 @@ export default function FloatingPromptBar({
         throw new Error(planData.error || 'ไม่สามารถวางโครงเรื่องสตอรี่บอร์ดได้');
       }
 
-      setStatusMsg(`✨ วางโครงเรื่อง "${planData.data.project_title}" สำเร็จ! กำลังบันทึกเป็นโปรเจกต์ใหม่...`);
+      setStatusMsg(`✨ วางโครงเรื่อง "${planData.data.project_title}" (${planData.data.shots.length} ช็อต) สำเร็จ! กำลังบันทึกเป็นโปรเจกต์ใหม่...`);
 
       // 2. Commit shots to board (Creates a distinct series!)
       const commitRes = await fetch('/api/storyboard/commit-shots', {
@@ -472,13 +527,30 @@ export default function FloatingPromptBar({
           </div>
         )}
 
+        {/* Auto-detected Script Banner */}
+        {detectedScript && detectedScript.shots && detectedScript.shots.length >= 2 && (
+          <div className="flex items-center justify-between p-2.5 rounded-xl bg-emerald-50 border border-emerald-300 mb-2.5 text-xs text-emerald-950 font-bold shadow-2xs">
+            <div className="flex items-center gap-2 min-w-0">
+              <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+              <span className="truncate">
+                ตรวจพบสคริปต์ {detectedScript.shots.length} ฉาก: <span className="font-extrabold text-stone-900">"{detectedScript.project_title}"</span>
+              </span>
+            </div>
+            <div className="flex items-center gap-2 flex-shrink-0 ml-2">
+              <span className="text-[10px] font-mono font-bold text-emerald-800 bg-white px-2 py-0.5 rounded border border-emerald-300">
+                พร้อมสร้าง {detectedScript.shots.length} ช็อต
+              </span>
+            </div>
+          </div>
+        )}
+
         {/* Middle: Textarea Prompt input */}
         <div className="relative mb-2.5">
           <textarea
             rows={2}
             value={promptText}
             onChange={(e) => setPromptText(e.target.value)}
-            placeholder="พิมพ์พล็อตเรื่องสตอรี่บอร์ด เช่น 'ขอสตอรี่บอร์ดในการไปเที่ยววัด จะทำคอนเท้นอย่างไรให้น่าสนใจ'..."
+            placeholder="พิมพ์พล็อตเรื่อง หรือวางสคริปต์หลายฉาก (Scene 1..N) ที่นี่..."
             className="w-full px-3.5 py-2 rounded-xl bg-stone-50/80 hover:bg-white focus:bg-white border border-stone-200 text-xs text-stone-900 placeholder:text-stone-400 focus:outline-none focus:border-[#F71C25] resize-none font-sans leading-relaxed shadow-2xs transition-all"
           />
         </div>
@@ -494,6 +566,37 @@ export default function FloatingPromptBar({
         {/* Bottom Row: Settings Pills & Big Action Buttons */}
         <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
           <div className="flex flex-wrap items-center gap-1.5 text-stone-600 font-mono text-[11px]">
+            {/* Quick Script Importer Button */}
+            {onOpenScriptImporter && (
+              <button
+                type="button"
+                onClick={onOpenScriptImporter}
+                className="px-2.5 py-1.5 rounded-xl bg-[#FDF8EE] hover:bg-[#FBEFC5] border border-[#EADBBD] text-[#F71C25] font-bold flex items-center gap-1.5 cursor-pointer shadow-2xs text-[11px] transition-all hover:scale-[1.02] active:scale-[0.98]"
+                title="เปิดเครื่องมือนำเข้าสคริปต์หลายฉาก (Scene 1..N)"
+              >
+                <FileText className="w-3.5 h-3.5" />
+                <span>📋 วางสคริปต์หลายฉาก</span>
+              </button>
+            )}
+
+            {/* Shot Count Selector (for freeform generation) */}
+            <div className="flex items-center gap-1 bg-stone-50 border border-stone-200 rounded-xl px-2.5 py-1 shadow-2xs">
+              <span className="text-[10px] text-stone-500 font-mono">จำนวนช็อต:</span>
+              <select
+                value={shotCount}
+                onChange={(e) => setShotCount(parseInt(e.target.value, 10))}
+                className="bg-transparent text-stone-900 font-bold text-[11px] font-mono outline-none cursor-pointer"
+                title="เลือกจำนวนช็อตที่จะสร้าง"
+              >
+                <option value={4}>4 ช็อต</option>
+                <option value={5}>5 ช็อต (ASMR)</option>
+                <option value={6}>6 ช็อต</option>
+                <option value={8}>8 ช็อต</option>
+                <option value={10}>10 ช็อต</option>
+                <option value={12}>12 ช็อต</option>
+              </select>
+            </div>
+
             {/* Interactive Model Selector */}
             <button
               onClick={cycleModel}

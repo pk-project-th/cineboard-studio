@@ -70,6 +70,23 @@ function resolveSketchTheme(shot) {
   const isCar = isCarWordEn || isCarWordTh;
 
   if (isCar) {
+    // Specific High-Priority ASMR & Craftsmanship Scenes
+    if (allText.includes('smart key') || allText.includes('smart access') || (allText.includes('key') && (allText.includes('door') || allText.includes('handle'))) || (allText.includes('กุญแจ') && allText.includes('ประตู'))) {
+      return 'car_smart_key_door';
+    }
+    if (allText.includes('unpeel') || allText.includes('peel') || allText.includes('protective film') || (allText.includes('film') && allText.includes('screen')) || allText.includes('ฟิล์ม') || allText.includes('ลอกฟิล์ม') || allText.includes('center console')) {
+      return 'car_unpeeling_screen';
+    }
+    if (allText.includes('tactile') || allText.includes('climate control') || (allText.includes('dial') && allText.includes('dashboard')) || allText.includes('control dial') || allText.includes('ปุ่มหมุน') || allText.includes('ปุ่มแอร์')) {
+      return 'car_dial_knob';
+    }
+    if (allText.includes('stitching') || allText.includes('stitch') || allText.includes('leather') || allText.includes('craftsmanship') || allText.includes('เย็บ') || allText.includes('หนังแท้')) {
+      return 'car_leather_stitching';
+    }
+    if (allText.includes('thud') || (allText.includes('door') && allText.includes('push')) || (allText.includes('door') && allText.includes('closed')) || allText.includes('ปิดประตู') || allText.includes('suv car door')) {
+      return 'car_door_thud';
+    }
+
     if (allText.includes('โชว์รูม') || allText.includes('เต็นท์') || allText.includes('dealership') || allText.includes('showroom') || (shotNum === 1 && (allText.includes('wide') || allText.includes('กว้าง')))) {
       return 'car_showroom_wide';
     }
@@ -666,6 +683,136 @@ function renderSimpleIllustration(theme) {
         <g transform="translate(384, 875)">
           <rect x="-240" y="-22" width="480" height="44" rx="22" fill="#ccff00" opacity="0.18" stroke="#ccff00" stroke-width="1.5"/>
           <text x="0" y="6" font-family="sans-serif" font-size="16" font-weight="900" fill="#ccff00" text-anchor="middle">LUXURY SMART KEY FOB</text>
+        </g>
+      `;
+
+    // 7.1 ASMR CRAFTSMANSHIP: SMART KEY APPROACHING DOOR
+    case 'car_smart_key_door':
+      return `
+        <rect x="100" y="240" width="568" height="540" rx="24" fill="#0f1118" stroke="#334155" stroke-width="3"/>
+        <circle cx="540" cy="360" r="120" fill="#facc15" opacity="0.15"/>
+        <path d="M 100 360 Q 384 320 668 350 L 668 700 L 100 700 Z" fill="#181e2b" stroke="#475569" stroke-width="3"/>
+        <line x1="420" y1="335" x2="420" y2="700" stroke="#0f1118" stroke-width="4"/>
+        <rect x="360" y="440" width="220" height="42" rx="12" fill="#0d1017" stroke="#94a3b8" stroke-width="3"/>
+        <line x1="390" y1="461" x2="550" y2="461" stroke="#38bdf8" stroke-width="2" opacity="0.6"/>
+        <g transform="translate(240, 520) rotate(-12)">
+          <ellipse cx="-20" cy="80" rx="60" ry="40" fill="#334155" opacity="0.5"/>
+          <path d="M -60 110 Q 0 80 40 60 L 60 120 Z" fill="#1e293b"/>
+          <rect x="0" y="0" width="90" height="150" rx="28" fill="#090a0f" stroke="#f8fafc" stroke-width="4"/>
+          <rect x="8" y="8" width="74" height="134" rx="22" fill="none" stroke="#facc15" stroke-width="2.5"/>
+          <circle cx="45" cy="40" r="14" fill="#1e293b" stroke="#ffffff" stroke-width="2"/>
+          <path d="M 40 36 L 50 36 M 45 32 L 45 44" stroke="#ffffff" stroke-width="2"/>
+          <circle cx="45" cy="75" r="12" fill="#1e293b" stroke="#ffffff" stroke-width="1.5"/>
+          <circle cx="45" cy="108" r="10" fill="#ef4444" stroke="#ffffff" stroke-width="1.5"/>
+        </g>
+        <path d="M 330 490 Q 350 480 370 490" stroke="#38bdf8" stroke-width="3" fill="none"/>
+        <path d="M 320 475 Q 355 460 385 475" stroke="#38bdf8" stroke-width="2.5" stroke-dasharray="6 4" fill="none"/>
+        <g transform="translate(384, 875)">
+          <rect x="-240" y="-22" width="480" height="44" rx="22" fill="#38bdf8" opacity="0.18" stroke="#38bdf8" stroke-width="1.5"/>
+          <text x="0" y="6" font-family="sans-serif" font-size="16" font-weight="900" fill="#38bdf8" text-anchor="middle">SMART ACCESS (ASMR KEY)</text>
+        </g>
+      `;
+
+    // 7.2 ASMR CRAFTSMANSHIP: UNPEELING CONSOLE SCREEN
+    case 'car_unpeeling_screen':
+      return `
+        <rect x="100" y="240" width="568" height="540" rx="24" fill="#0b0d14" stroke="#334155" stroke-width="3"/>
+        <g transform="translate(164, 300)">
+          <rect x="0" y="0" width="440" height="280" rx="18" fill="#131722" stroke="#475569" stroke-width="5"/>
+          <rect x="15" y="15" width="410" height="250" rx="12" fill="#070a10"/>
+          <text x="40" y="55" font-family="sans-serif" font-size="14" font-weight="bold" fill="#38bdf8">JAPANESE CRAFTSMANSHIP UI</text>
+          <circle cx="370" cy="50" r="14" fill="#1e293b" stroke="#ccff00" stroke-width="2"/>
+          <path d="M 40 120 Q 150 90 260 140 T 380 110" stroke="#38bdf8" stroke-width="3" fill="none" opacity="0.6"/>
+          <path d="M 280 15 L 425 15 L 425 170 Q 360 120 280 15 Z" fill="#38bdf8" opacity="0.35" stroke="#ffffff" stroke-width="3"/>
+          <path d="M 280 15 Q 330 90 425 170" stroke="#ffffff" stroke-width="4.5" fill="none"/>
+          <g transform="translate(390, 140)">
+            <ellipse cx="20" cy="10" rx="25" ry="16" fill="#334155" stroke="#f8fafc" stroke-width="2"/>
+            <path d="M 10 20 L 40 70 L 65 60 L 35 10 Z" fill="#1e293b"/>
+          </g>
+          <text x="310" y="70" font-family="monospace" font-size="11" font-weight="900" fill="#facc15">*CRISP PEEL*</text>
+        </g>
+        <g transform="translate(384, 875)">
+          <rect x="-240" y="-22" width="480" height="44" rx="22" fill="#ccff00" opacity="0.18" stroke="#ccff00" stroke-width="1.5"/>
+          <text x="0" y="6" font-family="sans-serif" font-size="16" font-weight="900" fill="#ccff00" text-anchor="middle">UNPEELING SCREEN (ASMR)</text>
+        </g>
+      `;
+
+    // 7.3 ASMR CRAFTSMANSHIP: TACTILE CLIMATE DIAL
+    case 'car_dial_knob':
+      return `
+        <rect x="100" y="240" width="568" height="540" rx="24" fill="#0d0f17" stroke="#334155" stroke-width="3"/>
+        <line x1="120" y1="360" x2="648" y2="360" stroke="#1e293b" stroke-width="2"/>
+        <line x1="120" y1="420" x2="648" y2="420" stroke="#1e293b" stroke-width="2"/>
+        <line x1="120" y1="600" x2="648" y2="600" stroke="#1e293b" stroke-width="2"/>
+        <g transform="translate(384, 480)">
+          <circle cx="0" cy="0" r="160" fill="#38bdf8" opacity="0.12"/>
+          <circle cx="0" cy="0" r="145" stroke="#38bdf8" stroke-width="4" stroke-dasharray="14 10" fill="none"/>
+          <circle cx="0" cy="0" r="130" fill="#1e2433" stroke="#94a3b8" stroke-width="8"/>
+          <line x1="0" y1="-130" x2="0" y2="-120" stroke="#f8fafc" stroke-width="4"/>
+          <line x1="33" y1="-125" x2="30" y2="-116" stroke="#f8fafc" stroke-width="4"/>
+          <line x1="65" y1="-112" x2="60" y2="-104" stroke="#f8fafc" stroke-width="4"/>
+          <line x1="91" y1="-91" x2="84" y2="-84" stroke="#f8fafc" stroke-width="4"/>
+          <line x1="112" y1="-65" x2="104" y2="-60" stroke="#f8fafc" stroke-width="4"/>
+          <line x1="125" y1="-33" x2="116" y2="-30" stroke="#f8fafc" stroke-width="4"/>
+          <line x1="130" y1="0" x2="120" y2="0" stroke="#f8fafc" stroke-width="4"/>
+          <circle cx="0" cy="0" r="110" fill="#090a0f" stroke="#facc15" stroke-width="3.5"/>
+          <text x="0" y="-15" font-family="monospace" font-size="34" font-weight="900" fill="#f8fafc" text-anchor="middle">21.5°C</text>
+          <text x="0" y="25" font-family="sans-serif" font-size="13" font-weight="900" fill="#38bdf8" text-anchor="middle">AUTO CLIMATE</text>
+          <circle cx="0" cy="55" r="8" fill="#ef4444"/>
+          <g transform="translate(75, 45)">
+            <ellipse cx="0" cy="0" rx="35" ry="22" fill="#334155" stroke="#ffffff" stroke-width="3"/>
+            <path d="M 15 15 L 70 80 L 95 65 L 35 0 Z" fill="#1e293b"/>
+            <path d="M -25 -15 L -40 -25 M -20 0 L -38 0 M -25 15 L -40 25" stroke="#ccff00" stroke-width="3.5"/>
+          </g>
+        </g>
+        <g transform="translate(384, 875)">
+          <rect x="-240" y="-22" width="480" height="44" rx="22" fill="#facc15" opacity="0.18" stroke="#facc15" stroke-width="1.5"/>
+          <text x="0" y="6" font-family="sans-serif" font-size="16" font-weight="900" fill="#facc15" text-anchor="middle">TACTILE CONTROLS (DIAL CLICK)</text>
+        </g>
+      `;
+
+    // 7.4 ASMR CRAFTSMANSHIP: LEATHER & STITCHING
+    case 'car_leather_stitching':
+      return `
+        <rect x="100" y="240" width="568" height="540" rx="24" fill="#0d0e14" stroke="#334155" stroke-width="3"/>
+        <polygon points="180,240 320,240 580,780 440,780" fill="#facc15" opacity="0.15"/>
+        <path d="M 120 720 Q 340 310 648 400" stroke="#1a1c26" stroke-width="90" fill="none" stroke-linecap="round"/>
+        <path d="M 120 720 Q 340 310 648 400" stroke="#334155" stroke-width="78" fill="none" stroke-linecap="round"/>
+        <path d="M 120 720 Q 340 310 648 400" stroke="#000000" stroke-width="6" fill="none"/>
+        <path d="M 120 720 Q 340 310 648 400" stroke="#ccff00" stroke-width="5" stroke-dasharray="8 8" fill="none"/>
+        <circle cx="280" cy="520" r="1.5" fill="#94a3b8"/>
+        <circle cx="310" cy="490" r="1.5" fill="#94a3b8"/>
+        <circle cx="340" cy="440" r="1.5" fill="#94a3b8"/>
+        <g transform="translate(340, 430)">
+          <ellipse cx="0" cy="0" rx="26" ry="18" fill="#334155" stroke="#f8fafc" stroke-width="3"/>
+          <path d="M 10 10 L 60 70 L 90 55 L 30 -5 Z" fill="#1e293b"/>
+          <line x1="-15" y1="0" x2="15" y2="0" stroke="#facc15" stroke-width="2"/>
+        </g>
+        <g transform="translate(384, 875)">
+          <rect x="-240" y="-22" width="480" height="44" rx="22" fill="#facc15" opacity="0.18" stroke="#facc15" stroke-width="1.5"/>
+          <text x="0" y="6" font-family="sans-serif" font-size="16" font-weight="900" fill="#facc15" text-anchor="middle">LEATHER &amp; CRAFTSMANSHIP STITCHING</text>
+        </g>
+      `;
+
+    // 7.5 ASMR CRAFTSMANSHIP: THE SOLID "THUD"
+    case 'car_door_thud':
+      return `
+        <rect x="100" y="240" width="568" height="540" rx="24" fill="#080a10" stroke="#334155" stroke-width="3"/>
+        <path d="M 100 320 Q 384 300 668 330 L 668 760 L 100 760 Z" fill="#111827" stroke="#374151" stroke-width="3"/>
+        <polygon points="120,380 200,340 320,760 240,760" fill="#1e293b" opacity="0.4"/>
+        <polygon points="400,330 460,330 550,760 490,760" fill="#38bdf8" opacity="0.15"/>
+        <line x1="384" y1="310" x2="384" y2="760" stroke="#000000" stroke-width="8"/>
+        <line x1="380" y1="310" x2="380" y2="760" stroke="#38bdf8" stroke-width="2" opacity="0.5"/>
+        <g transform="translate(370, 500)">
+          <ellipse cx="25" cy="0" rx="40" ry="26" fill="#334155" stroke="#f8fafc" stroke-width="3"/>
+          <path d="M 50 15 L 120 70 L 150 40 L 70 -10 Z" fill="#1e293b"/>
+          <circle cx="0" cy="0" r="45" stroke="#ccff00" stroke-width="3" stroke-dasharray="10 6" fill="none"/>
+          <circle cx="0" cy="0" r="75" stroke="#facc15" stroke-width="2.5" opacity="0.7" fill="none"/>
+          <text x="-60" y="-30" font-family="monospace" font-size="18" font-weight="900" fill="#ccff00">*SOLID THUD*</text>
+        </g>
+        <g transform="translate(384, 875)">
+          <rect x="-240" y="-22" width="480" height="44" rx="22" fill="#ef4444" opacity="0.18" stroke="#ef4444" stroke-width="1.5"/>
+          <text x="0" y="6" font-family="sans-serif" font-size="16" font-weight="900" fill="#ef4444" text-anchor="middle">THE SOLID "THUD" (ACOUSTIC CLOSE)</text>
         </g>
       `;
 

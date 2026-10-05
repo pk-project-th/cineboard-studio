@@ -1,7 +1,7 @@
 import React from 'react';
 import {
   Search, Folder, Bell, Layers, Sparkles, Film, Video,
-  Image as ImageIcon, Volume2, ShieldCheck, Compass, Flame, Zap
+  Image as ImageIcon, Volume2, ShieldCheck, Compass, Flame, Zap, FileText
 } from 'lucide-react';
 
 export default function TopNav({
@@ -12,6 +12,7 @@ export default function TopNav({
   onOpenAudio,
   onOpenViralGuide,
   onOpenGroqModal,
+  onOpenScriptImporter,
   currentView,
   setCurrentView
 }) {
@@ -56,6 +57,18 @@ export default function TopNav({
             <Layers className="w-3.5 h-3.5 text-[#F71C25]" />
             <span>คลัง Asset</span>
           </button>
+
+          {/* 2.1 Direct Script Importer (Offline Multi-Scene) */}
+          {onOpenScriptImporter && (
+            <button
+              onClick={onOpenScriptImporter}
+              className="px-3 py-2 rounded-xl bg-[#FDF8EE] hover:bg-[#FBEFC5] border border-[#EADBBD] text-stone-900 flex items-center gap-1.5 font-bold transition-all cursor-pointer shadow-2xs active:scale-[0.98]"
+              title="วางบทสคริปต์หลายฉาก (Scene 1..N) เพื่อสร้างสตอรี่บอร์ดทันที โดยไม่ต้องใช้ Groq"
+            >
+              <FileText className="w-3.5 h-3.5 text-[#F71C25]" />
+              <span>นำเข้าบทสคริปต์</span>
+            </button>
+          )}
 
           {/* 3. Board View */}
           <button

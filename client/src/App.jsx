@@ -16,6 +16,7 @@ import ClipEditorModal from './components/ClipEditorModal';
 import AudioSimulatorModal from './components/AudioSimulatorModal';
 import ProductionGuideModal from './components/ProductionGuideModal';
 import GroqScriptModal from './components/GroqScriptModal';
+import ScriptImportModal from './components/ScriptImportModal';
 import DeleteConfirmModal from './components/DeleteConfirmModal';
 import EditShotModal from './components/EditShotModal';
 import AdminDashboard from './admin/AdminDashboard';
@@ -33,6 +34,7 @@ export default function App() {
   // Modals
   const [storyboardBuilderOpen, setStoryboardBuilderOpen] = useState(false);
   const [assetManagerOpen, setAssetManagerOpen] = useState(false);
+  const [scriptImportOpen, setScriptImportOpen] = useState(false);
   const [imageViewerOpen, setImageViewerOpen] = useState(false);
   const [videoModalOpen, setVideoModalOpen] = useState(false);
   const [clipEditorOpen, setClipEditorOpen] = useState(false);
@@ -324,6 +326,7 @@ export default function App() {
         onOpenAudio={() => setAudioModalOpen(true)}
         onOpenViralGuide={() => setViralGuideOpen(true)}
         onOpenGroqModal={() => setGroqModalOpen(true)}
+        onOpenScriptImporter={() => setScriptImportOpen(true)}
         currentView={currentView}
         setCurrentView={setCurrentView}
       />
@@ -426,6 +429,7 @@ export default function App() {
                     onStoryboardCommitted={handleStoryboardCommitted}
                     selectedItem={selectedItem}
                     onOpenGroqModal={() => setGroqModalOpen(true)}
+                    onOpenScriptImporter={() => setScriptImportOpen(true)}
                     customPromptSeed={customPromptSeed}
                     selectedSeriesId={selectedSeriesId}
                     seriesList={seriesList}
@@ -488,6 +492,13 @@ export default function App() {
         onAssetCreated={() => {
           // Re-fetch or pass through
         }}
+      />
+
+      {/* Direct Multi-Scene Script Importer Modal */}
+      <ScriptImportModal
+        isOpen={scriptImportOpen}
+        onClose={() => setScriptImportOpen(false)}
+        onStoryboardCommitted={handleStoryboardCommitted}
       />
 
       {/* Delete Confirmation Modal */}
