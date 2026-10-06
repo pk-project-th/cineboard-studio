@@ -28,9 +28,24 @@ export default function FloatingPromptBar({
   onStartNewProject,
   onAppendShotToCurrent
 }) {
-  const [promptText, setPromptText] = useState(
-    'ขอสตอรี่บอร์ดในการไปเที่ยววัด จะทำคอนเท้นอย่างไรให้น่าสนใจ'
-  );
+  const [promptText, setPromptText] = useState(() => {
+    try {
+      return localStorage.getItem('cineprompt_draft_text') || '';
+    } catch (_) {
+      return '';
+    }
+  });
+
+  const updatePromptText = (val) => {
+    setPromptText(val);
+    try {
+      if (val && val.trim()) {
+        localStorage.setItem('cineprompt_draft_text', val);
+      } else {
+        localStorage.removeItem('cineprompt_draft_text');
+      }
+    } catch (_) {}
+  };
   const [selectedModelIdx, setSelectedModelIdx] = useState(0);
   const [aspectRatio, setAspectRatio] = useState('9:16');
   const [shotCount, setShotCount] = useState(5);
@@ -57,10 +72,12 @@ export default function FloatingPromptBar({
   };
 
   useEffect(() => {
-    if (customPromptSeed) {
-      setPromptText(customPromptSeed);
-      setStatusMsg('⚡ ดึง Prompt จาก AI เรียบร้อยแล้ว! พร้อมกด Generate');
-      setTimeout(() => setStatusMsg(''), 4000);
+    if (customPromptSeed !== undefined && customPromptSeed !== null) {
+      updatePromptText(customPromptSeed);
+      if (customPromptSeed) {
+        setStatusMsg('⚡ ดึง Prompt จาก AI เรียบร้อยแล้ว! พร้อมกด Generate');
+        setTimeout(() => setStatusMsg(''), 4000);
+      }
     }
   }, [customPromptSeed]);
 
@@ -136,7 +153,7 @@ export default function FloatingPromptBar({
       if (data.success && data.data) {
         const visionData = data.data;
         if (visionData.first_frame_prompt) {
-          setPromptText(visionData.first_frame_prompt);
+          updatePromptText(visionData.first_frame_prompt);
         }
         setStatusMsg(`✨ Gemini 3.8 วิเคราะห์สำเร็จ: "${visionData.title || 'ตอนใหม่'}"`);
         confetti({
@@ -255,6 +272,7 @@ export default function FloatingPromptBar({
         });
 
         setStatusMsg(`🎉 สร้างโปรเจกต์ใหม่ "${planData.data.project_title}" (${commitData.data.length} ช็อต) สำเร็จแล้ว!`);
+        updatePromptText('');
         if (onStoryboardCommitted) {
           onStoryboardCommitted({
             series_id: commitData.series_id,
@@ -314,6 +332,7 @@ export default function FloatingPromptBar({
           colors: ['#38bdf8', '#818cf8', '#ffffff']
         });
         setStatusMsg(`✅ เพิ่มช็อตใหม่ลงในโปรเจกต์เรียบร้อย!`);
+        updatePromptText('');
         if (onAppendShotToCurrent) {
           onAppendShotToCurrent(data.data);
         } else if (onGenerateNewPrompt) {
@@ -371,6 +390,7 @@ export default function FloatingPromptBar({
         });
 
         setStatusMsg(`สร้างภาพสำเร็จด้วย ${currentModel.name}!`);
+        updatePromptText('');
         if (onGenerateNewPrompt) {
           onGenerateNewPrompt(data.data);
         }
@@ -483,25 +503,25 @@ export default function FloatingPromptBar({
           {/* Quick viral scene presets */}
           <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar text-[11px] font-mono">
             <button
-              onClick={() => setPromptText('ขอสตอรี่บอร์ดในการไปเที่ยววัด จะทำคอนเท้นอย่างไรให้น่าสนใจ')}
+              onClick={() => updatePromptText('ขอสตอรี่บอร์ดในการไปเที่ยววัด จะทำคอนเท้นอย่างไรให้น่าสนใจ')}
               className="px-2.5 py-1 rounded-lg bg-[#FBEFC5] border border-[#E5D7A3] text-stone-900 hover:bg-[#F5E6B8] whitespace-nowrap cursor-pointer font-bold shadow-2xs"
             >
               🙏 เที่ยววัด & วัฒนธรรม
             </button>
             <button
-              onClick={() => setPromptText('ขอสตอรี่บอร์ดในการทำคอนเท้นขายรถมือสอง สภาพนางฟ้า ไม่ชนหนัก ไมล์แท้ การันตีคืนเงิน')}
+              onClick={() => updatePromptText('ขอสตอรี่บอร์ดในการทำคอนเท้นขายรถมือสอง สภาพนางฟ้า ไม่ชนหนัก ไมล์แท้ การันตีคืนเงิน')}
               className="px-2.5 py-1 rounded-lg bg-stone-50 border border-stone-200 text-stone-700 hover:border-[#F71C25]/40 hover:text-stone-950 whitespace-nowrap cursor-pointer"
             >
               🚗 ขายรถมือสองสภาพนางฟ้า
             </button>
             <button
-              onClick={() => setPromptText('สตอรี่บอร์ดโฆษณาเซรั่มหน้าใส สู้แดดเมืองไทย ป้องกันฝ้ากระ ผิวฉ่ำโกลว์ใน 7 วัน')}
+              onClick={() => updatePromptText('สตอรี่บอร์ดโฆษณาเซรั่มหน้าใส สู้แดดเมืองไทย ป้องกันฝ้ากระ ผิวฉ่ำโกลว์ใน 7 วัน')}
               className="px-2.5 py-1 rounded-lg bg-stone-50 border border-stone-200 text-stone-700 hover:border-[#F71C25]/40 hover:text-stone-950 whitespace-nowrap cursor-pointer"
             >
               ✨ เซรั่มหน้าใสผิวฉ่ำโกลว์
             </button>
             <button
-              onClick={() => setPromptText('สตอรี่บอร์ดรีวิวร้านอาหารลับ คาเฟ่สุดชิค กาแฟโบราณรสเข้ม บรรยากาศสุดชิลล์')}
+              onClick={() => updatePromptText('สตอรี่บอร์ดรีวิวร้านอาหารลับ คาเฟ่สุดชิค กาแฟโบราณรสเข้ม บรรยากาศสุดชิลล์')}
               className="px-2.5 py-1 rounded-lg bg-stone-50 border border-stone-200 text-stone-700 hover:border-[#F71C25]/40 hover:text-stone-950 whitespace-nowrap cursor-pointer"
             >
               ☕ รีวิวคาเฟ่ลับ
@@ -592,7 +612,7 @@ export default function FloatingPromptBar({
           <textarea
             rows={2}
             value={promptText}
-            onChange={(e) => setPromptText(e.target.value)}
+            onChange={(e) => updatePromptText(e.target.value)}
             placeholder="พิมพ์พล็อตเรื่อง หรือวางสคริปต์หลายฉาก (Scene 1..N) ที่นี่..."
             className="w-full px-3.5 py-2 rounded-xl bg-stone-50/80 hover:bg-white focus:bg-white border border-stone-200 text-xs text-stone-900 placeholder:text-stone-400 focus:outline-none focus:border-[#F71C25] resize-none font-sans leading-relaxed shadow-2xs transition-all"
           />

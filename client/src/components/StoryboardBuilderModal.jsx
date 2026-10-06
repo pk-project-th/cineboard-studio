@@ -20,7 +20,7 @@ export default function StoryboardBuilderModal({
   initialConcept
 }) {
   const [step, setStep] = useState(1); // 1: Concept & Assets, 2: Storyboard Plan & Camera Angles
-  const [concept, setConcept] = useState(initialConcept || 'ขอสตอรี่บอร์ดในการไปเที่ยววัด จะทำคอนเท้นอย่างไรให้น่าสนใจ');
+  const [concept, setConcept] = useState(initialConcept || '');
   const [style, setStyle] = useState('sketch');
   const [numShots, setNumShots] = useState(12);
   const [targetDuration, setTargetDuration] = useState(30);
@@ -123,8 +123,8 @@ export default function StoryboardBuilderModal({
   }, [isOpen]);
 
   useEffect(() => {
-    if (initialConcept) {
-      setConcept(initialConcept);
+    if (initialConcept !== undefined) {
+      setConcept(initialConcept || '');
     }
   }, [initialConcept]);
 

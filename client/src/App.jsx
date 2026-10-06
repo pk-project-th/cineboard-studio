@@ -100,17 +100,41 @@ export default function App() {
     }
   };
 
-  // Initial load: Default to the latest active project instead of clumping all projects together!
+  // Initial load: Default to saved active project or latest available project
   useEffect(() => {
     const init = async () => {
       const series = await fetchSeries();
-      const initialId = (series && series.length > 0) ? series[0].id : 'all';
-      setSelectedSeriesId(initialId);
-      await fetchPrompts(initialId);
+      const lastActiveId = localStorage.getItem('cineprompt_last_active_series');
+      let targetId = 'all';
+
+      if (series && series.length > 0) {
+        if (lastActiveId && series.some(s => s.id === lastActiveId)) {
+          targetId = lastActiveId;
+        } else {
+          targetId = series[0].id;
+        }
+      } else {
+        targetId = 'all';
+      }
+
+      setSelectedSeriesId(targetId);
+      await fetchPrompts(targetId);
       await fetchStats();
     };
     init();
   }, []);
+
+  const handleSelectSeries = (id) => {
+    setSelectedSeriesId(id);
+    try {
+      if (id && id !== 'all') {
+        localStorage.setItem('cineprompt_last_active_series', id);
+      } else {
+        localStorage.removeItem('cineprompt_last_active_series');
+      }
+    } catch (_) {}
+    fetchPrompts(id);
+  };
 
   const handleSelectOtherItem = (promptId) => {
     const found = prompts.find(p => p.id === promptId);
@@ -119,7 +143,7 @@ export default function App() {
 
   // Dedicated Start New Project handler
   const handleStartNewProject = () => {
-    setCustomPromptSeed('ขอสตอรี่บอร์ดในการไปเที่ยววัด จะทำคอนเท้นอย่างไรให้น่าสนใจ');
+    setCustomPromptSeed('');
     setStoryboardBuilderOpen(true);
   };
 
@@ -146,9 +170,11 @@ export default function App() {
     const updatedSeries = await fetchSeries();
     if (seriesId) {
       setSelectedSeriesId(seriesId);
+      try { localStorage.setItem('cineprompt_last_active_series', seriesId); } catch (_) {}
       await fetchPrompts(seriesId);
     } else if (updatedSeries && updatedSeries.length > 0) {
       setSelectedSeriesId(updatedSeries[0].id);
+      try { localStorage.setItem('cineprompt_last_active_series', updatedSeries[0].id); } catch (_) {}
       await fetchPrompts(updatedSeries[0].id);
     } else {
       setPrompts(shots);
@@ -275,6 +301,7 @@ export default function App() {
 
           await fetchSeries();
           if (selectedSeriesId === s.id) {
+            try { localStorage.removeItem('cineprompt_last_active_series'); } catch (_) {}
             setSelectedSeriesId('all');
             await fetchPrompts('all');
           } else {
@@ -298,6 +325,10 @@ export default function App() {
       const res = await fetch('/api/admin/clear', { method: 'POST' });
       const data = await res.json();
       if (data.success) {
+        try {
+          localStorage.removeItem('cineprompt_last_active_series');
+          localStorage.removeItem('cineprompt_draft_text');
+        } catch (_) {}
         setPrompts([]);
         setSeriesList([]);
         setSelectedSeriesId('all');
@@ -367,10 +398,7 @@ export default function App() {
             onClearBoard={handleClearAllBoard}
             seriesList={seriesList}
             selectedSeriesId={selectedSeriesId}
-            onSelectSeries={(id) => {
-              setSelectedSeriesId(id);
-              fetchPrompts(id);
-            }}
+            onSelectSeries={handleSelectSeries}
             onDeleteSeries={handleDeleteSeries}
             onStartNewProject={handleStartNewProject}
             promptsCount={prompts.length}
@@ -416,8 +444,7 @@ export default function App() {
                     seriesList={seriesList}
                     selectedSeriesId={selectedSeriesId}
                     onSelectSeries={(id) => {
-                      setSelectedSeriesId(id);
-                      fetchPrompts(id);
+                      handleSelectSeries(id);
                       setActiveBoardTab('board');
                     }}
                     onDeleteSeries={handleDeleteSeries}
