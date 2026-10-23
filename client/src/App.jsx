@@ -2,59 +2,35 @@ import React, { useState, useEffect } from 'react';
 import TopNav from './components/TopNav';
 import BoardHeader from './components/BoardHeader';
 import BoardView from './components/BoardView';
-import InspirationsView from './components/InspirationsView';
-import ProjectHistoryView from './components/ProjectHistoryView';
-import ExploreView from './components/ExploreView';
-import FloatingPromptBar from './components/FloatingPromptBar';
+import ShotListView from './components/ShotListView';
+import BriefView from './components/BriefView';
 import DetailInspector from './components/DetailInspector';
-import MobileBottomNav from './components/MobileBottomNav';
-import StoryboardBuilderModal from './components/StoryboardBuilderModal';
-import AssetManagerModal from './components/AssetManagerModal';
-import VideoStudioModal from './components/VideoStudioModal';
+import SettingsModal from './components/SettingsModal';
 import ImageViewerModal from './components/ImageViewerModal';
-import ClipEditorModal from './components/ClipEditorModal';
-import AudioSimulatorModal from './components/AudioSimulatorModal';
-import ProductionGuideModal from './components/ProductionGuideModal';
-import GroqScriptModal from './components/GroqScriptModal';
-import ScriptImportModal from './components/ScriptImportModal';
-import DeleteConfirmModal from './components/DeleteConfirmModal';
 import EditShotModal from './components/EditShotModal';
-import AdminDashboard from './admin/AdminDashboard';
+import DeleteConfirmModal from './components/DeleteConfirmModal';
 import { RefreshCw } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
 export default function App() {
-  const [currentView, setCurrentView] = useState('visitor'); // 'visitor' | 'admin'
-  const [activeNav, setActiveNav] = useState('image'); // 'explore' | 'image' | 'video'
-  const [activeBoardTab, setActiveBoardTab] = useState('board'); // 'board' | 'inspirations'
-  const [filterType, setFilterType] = useState('all'); // 'all' | 'image' | 'video' | 'audio' | 'global'
+  // Step Navigation: 'brief' (Step 1) | 'shotlist' (Step 2) | 'board' (Step 3)
+  const [activeStep, setActiveStep] = useState('board');
   const [zoomLevel, setZoomLevel] = useState(2); // 1, 2, 3
   const [selectedItem, setSelectedItem] = useState(null);
 
   // Modals
-  const [storyboardBuilderOpen, setStoryboardBuilderOpen] = useState(false);
-  const [assetManagerOpen, setAssetManagerOpen] = useState(false);
-  const [scriptImportOpen, setScriptImportOpen] = useState(false);
-  const [scriptSeedText, setScriptSeedText] = useState('');
+  const [settingsModalOpen, setSettingsModalOpen] = useState(false);
   const [imageViewerOpen, setImageViewerOpen] = useState(false);
-  const [videoModalOpen, setVideoModalOpen] = useState(false);
-  const [clipEditorOpen, setClipEditorOpen] = useState(false);
   const [editShotModalOpen, setEditShotModalOpen] = useState(false);
-  const [audioModalOpen, setAudioModalOpen] = useState(false);
-  const [viralGuideOpen, setViralGuideOpen] = useState(false);
-  const [groqModalOpen, setGroqModalOpen] = useState(false);
-  const [customPromptSeed, setCustomPromptSeed] = useState(null);
-  
-  // Delete Modal State
-  const [deleteModalConfig, setDeleteModalConfig] = useState(null); // { title, message, onConfirm }
-  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteModalConfig, setDeleteModalConfig] = useState(null);
 
+  // Data
   const [prompts, setPrompts] = useState([]);
   const [seriesList, setSeriesList] = useState([]);
   const [selectedSeriesId, setSelectedSeriesId] = useState('all');
-  const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
 
+  // Fetch Series
   const fetchSeries = async () => {
     try {
       const res = await fetch('/api/series');
@@ -69,6 +45,7 @@ export default function App() {
     return [];
   };
 
+  // Fetch Prompts
   const fetchPrompts = async (seriesId = selectedSeriesId) => {
     setLoading(true);
     try {
@@ -90,17 +67,7 @@ export default function App() {
     }
   };
 
-  const fetchStats = async () => {
-    try {
-      const res = await fetch('/api/stats');
-      const data = await res.json();
-      if (data.success) setStats(data.data);
-    } catch (err) {
-      console.error('Failed to fetch stats', err);
-    }
-  };
-
-  // Initial load: Default to saved active project or latest available project
+  // Initial Load: Restore last active project or latest
   useEffect(() => {
     const init = async () => {
       const series = await fetchSeries();
@@ -108,22 +75,25 @@ export default function App() {
       let targetId = 'all';
 
       if (series && series.length > 0) {
-        if (lastActiveId && series.some(s => s.id === lastActiveId)) {
+        if (lastActiveId && series.some((s) => s.id === lastActiveId)) {
           targetId = lastActiveId;
         } else {
           targetId = series[0].id;
         }
+        setSelectedSeriesId(targetId);
+        await fetchPrompts(targetId);
+        setActiveStep('board');
       } else {
         targetId = 'all';
+        setSelectedSeriesId('all');
+        await fetchPrompts('all');
+        setActiveStep('brief');
       }
-
-      setSelectedSeriesId(targetId);
-      await fetchPrompts(targetId);
-      await fetchStats();
     };
     init();
   }, []);
 
+  // Handle Project Selection
   const handleSelectSeries = (id) => {
     setSelectedSeriesId(id);
     try {
@@ -134,191 +104,119 @@ export default function App() {
       }
     } catch (_) {}
     fetchPrompts(id);
+    setActiveStep('board');
   };
 
-  const handleSelectOtherItem = (promptId) => {
-    const found = prompts.find(p => p.id === promptId);
-    if (found) setSelectedItem(found);
-  };
-
-  // Dedicated Start New Project handler
+  // Start New Project
   const handleStartNewProject = () => {
-    setCustomPromptSeed('');
-    setStoryboardBuilderOpen(true);
+    setActiveStep('brief');
   };
 
-  // Dedicated handler for appending a single shot into active project
-  const handleAppendShotToCurrent = async (newShot) => {
-    if (!newShot) return;
-    setPrompts((prev) => [...prev, newShot]);
-    setSelectedItem(newShot);
+  // When a new storyboard is created from Step 1
+  const handleStoryboardCreated = async (payload) => {
+    const seriesId = payload?.series_id;
     await fetchSeries();
-  };
-
-  // Dedicated handler when a new storyboard project is committed
-  const handleStoryboardCommitted = async (payload) => {
-    let seriesId = null;
-    let shots = [];
-    if (payload && payload.data && Array.isArray(payload.data)) {
-      seriesId = payload.series_id || payload.data[0]?.series_id;
-      shots = payload.data;
-    } else if (Array.isArray(payload)) {
-      shots = payload;
-      seriesId = payload[0]?.series_id;
-    }
-
-    const updatedSeries = await fetchSeries();
     if (seriesId) {
       setSelectedSeriesId(seriesId);
-      try { localStorage.setItem('cineprompt_last_active_series', seriesId); } catch (_) {}
+      try {
+        localStorage.setItem('cineprompt_last_active_series', seriesId);
+      } catch (_) {}
       await fetchPrompts(seriesId);
-    } else if (updatedSeries && updatedSeries.length > 0) {
-      setSelectedSeriesId(updatedSeries[0].id);
-      try { localStorage.setItem('cineprompt_last_active_series', updatedSeries[0].id); } catch (_) {}
-      await fetchPrompts(updatedSeries[0].id);
-    } else {
-      setPrompts(shots);
-      if (shots.length > 0) setSelectedItem(shots[0]);
+    }
+    // Switch to Step 2: Shot List Breakdown
+    setActiveStep('shotlist');
+  };
+
+  // Generate real AI image for a specific shot
+  const handleGenerateImageForShot = async (shot) => {
+    if (!shot || !shot.id) return;
+    const promptText = shot.content || shot.prompt || shot.title;
+    const res = await fetch(`/api/prompts/${shot.id}/generate-image`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        prompt: promptText,
+        aspect_ratio: shot.aspect_ratio || '16:9'
+      })
+    });
+
+    const data = await res.json();
+    if (!data.success) {
+      throw new Error(data.error || 'สร้างภาพไม่สำเร็จ');
     }
 
-    setActiveNav('image');
-    setActiveBoardTab('board');
+    // Update local state immediately
+    const updated = data.data;
+    setPrompts((prev) => prev.map((p) => (p.id === shot.id ? updated : p)));
+    if (selectedItem?.id === shot.id) {
+      setSelectedItem(updated);
+    }
+    return updated;
   };
 
-  // Real AI generation callback: add to prompts list and inspect
-  const handleGenerateNewPrompt = (newItem) => {
-    setPrompts((prev) => [newItem, ...prev]);
-    setSelectedItem(newItem);
-    setActiveNav('image');
-    setActiveBoardTab('board');
-  };
-
-  // Handle when a single shot is edited and updated
+  // Handle Shot Updated from modal or inline editor
   const handleShotUpdated = (updatedShot) => {
     if (!updatedShot) return;
-    setPrompts((prev) => prev.map(p => p.id === updatedShot.id ? updatedShot : p));
-    setSelectedItem(updatedShot);
-  };
-
-  // When clicking template in Explore tab
-  const handleUseTemplate = async (tpl) => {
-    if (tpl.shots && Array.isArray(tpl.shots)) {
-      try {
-        const res = await fetch('/api/storyboard/commit-shots', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            shots: tpl.shots,
-            project_title: tpl.title,
-            visual_style: tpl.visual_style
-          })
-        });
-        const data = await res.json();
-        if (data.success && data.data) {
-          setPrompts((prev) => [...data.data, ...prev]);
-          setSelectedItem(data.data[0]);
-          setActiveNav('image');
-          setActiveBoardTab('board');
-          confetti({ particleCount: 50, spread: 70, origin: { y: 0.6 } });
-          return;
-        }
-      } catch (err) {
-        console.error('Error applying storyboard template', err);
-      }
+    setPrompts((prev) => prev.map((p) => (p.id === updatedShot.id ? updatedShot : p)));
+    if (selectedItem?.id === updatedShot.id) {
+      setSelectedItem(updatedShot);
     }
-
-    handleGenerateNewPrompt({
-      id: 'tpl-gen-' + Date.now(),
-      title: tpl.title,
-      subtitle: tpl.category,
-      prompt_type: 'first_frame',
-      aspect_ratio: tpl.aspect || '9:16',
-      recommended_tool: 'Studio Engine (Groq & Gemini)',
-      content: tpl.prompt || tpl.summary,
-      dialogue_script: tpl.dialogue || '',
-      image_url: tpl.image,
-      copy_count: 1
-    });
   };
 
-  // Handle delete a single shot
-  const handleDeletePrompt = (p) => {
-    if (!p) return;
+  // Delete an individual shot
+  const handleDeletePrompt = (id) => {
     setDeleteModalConfig({
-      title: 'ยืนยันการลบการ์ดช็อต',
-      message: (
-        <span>
-          คุณแน่ใจหรือไม่ว่าต้องการลบการ์ด <span className="font-bold text-stone-200">"{p.title}"</span> ออกจากบอร์ด? การกระทำนี้ไม่สามารถย้อนกลับได้
-        </span>
-      ),
+      title: 'ยืนยันการลบช็อต',
+      message: 'คุณแน่ใจหรือไม่ว่าต้องการลบช็อตนี้ออกจากสตอรี่บอร์ด?',
       onConfirm: async () => {
-        setIsDeleting(true);
         try {
-          const res = await fetch(`/api/prompts/${p.id}`, { method: 'DELETE' });
+          const res = await fetch(`/api/prompts/${id}`, { method: 'DELETE' });
           const data = await res.json();
           if (data.success) {
-            setPrompts((prev) => prev.filter((item) => item.id !== p.id));
-            if (selectedItem?.id === p.id) {
+            setPrompts((prev) => prev.filter((p) => p.id !== id));
+            if (selectedItem?.id === id) {
               setSelectedItem(null);
             }
-            await fetchSeries();
-            setDeleteModalConfig(null);
-            confetti({ particleCount: 30, spread: 50, colors: ['#ff4d4f', '#ffffff'] });
           } else {
             alert(data.error || 'ลบไม่สำเร็จ');
           }
         } catch (err) {
           console.error(err);
-          alert('เกิดข้อผิดพลาดในการลบการ์ด');
+          alert('เกิดข้อผิดพลาดในการลบช็อต');
         } finally {
-          setIsDeleting(false);
-        }
-      }
-    });
-  };
-
-  // Handle delete an entire storyboard project (series)
-  const handleDeleteSeries = (seriesItemOrId) => {
-    const s = typeof seriesItemOrId === 'object'
-      ? seriesItemOrId
-      : seriesList.find(item => item.id === seriesItemOrId) || { id: seriesItemOrId, title: 'โปรเจกต์นี้' };
-
-    setDeleteModalConfig({
-      title: 'ยืนยันการลบโปรเจกต์สตอรี่บอร์ด',
-      message: (
-        <span>
-          คุณแน่ใจหรือไม่ว่าต้องการลบโปรเจกต์ <span className="font-bold text-stone-200">"{s.title}"</span> และช็อตทั้งหมดในโปรเจกต์นี้? การกระทำนี้ไม่สามารถย้อนกลับได้
-        </span>
-      ),
-      onConfirm: async () => {
-        setIsDeleting(true);
-        try {
-          // Optimistically remove from state immediately
-          setSeriesList(prev => prev.filter(item => item.id !== s.id));
-
-          const res = await fetch(`/api/series/${encodeURIComponent(s.id)}`, { method: 'DELETE' });
-          const data = await res.json();
-
-          await fetchSeries();
-          if (selectedSeriesId === s.id) {
-            try { localStorage.removeItem('cineprompt_last_active_series'); } catch (_) {}
-            setSelectedSeriesId('all');
-            await fetchPrompts('all');
-          } else {
-            await fetchPrompts(selectedSeriesId);
-          }
-          confetti({ particleCount: 35, spread: 60, colors: ['#ff4d4f', '#ffffff'] });
-        } catch (err) {
-          console.error(err);
-          await fetchSeries();
-        } finally {
-          setIsDeleting(false);
           setDeleteModalConfig(null);
         }
       }
     });
   };
 
+  // Delete an entire project
+  const handleDeleteSeries = (seriesId) => {
+    const s = seriesList.find((item) => item.id === seriesId) || { id: seriesId, title: 'โปรเจกต์นี้' };
+    setDeleteModalConfig({
+      title: 'ยืนยันการลบโปรเจกต์สตอรี่บอร์ด',
+      message: `คุณแน่ใจหรือไม่ว่าต้องการลบโปรเจกต์ "${s.title}" และช็อตทั้งหมดในโปรเจกต์นี้?`,
+      onConfirm: async () => {
+        try {
+          await fetch(`/api/series/${encodeURIComponent(s.id)}`, { method: 'DELETE' });
+          await fetchSeries();
+          if (selectedSeriesId === s.id) {
+            try {
+              localStorage.removeItem('cineprompt_last_active_series');
+            } catch (_) {}
+            setSelectedSeriesId('all');
+            await fetchPrompts('all');
+          }
+        } catch (err) {
+          console.error(err);
+        } finally {
+          setDeleteModalConfig(null);
+        }
+      }
+    });
+  };
+
+  // Clear all board data
   const handleClearAllBoard = async () => {
     if (!window.confirm('คุณต้องการล้างการ์ดบนบอร์ดทั้งหมดเพื่อเริ่มสร้างสตอรี่บอร์ดใหม่ใช่หรือไม่?')) return;
     try {
@@ -333,7 +231,8 @@ export default function App() {
         setSeriesList([]);
         setSelectedSeriesId('all');
         setSelectedItem(null);
-        confetti({ particleCount: 40, spread: 70, colors: ['#F71C25', '#ff4d4f', '#ffffff'] });
+        setActiveStep('brief');
+        confetti({ particleCount: 30, spread: 60, colors: ['#F71C25', '#FF4D4D', '#ffffff'] });
       } else {
         alert(data.error || 'ล้างข้อมูลไม่สำเร็จ');
       }
@@ -343,270 +242,152 @@ export default function App() {
     }
   };
 
+  // Current active series object
+  const activeSeries = seriesList.find((s) => s.id === selectedSeriesId);
+
   return (
     <div className="h-screen w-screen bg-[#FAF9F5] text-stone-900 flex flex-col overflow-hidden font-sans select-none selection:bg-[#F71C25]/20 selection:text-[#F71C25]">
       {/* 1. Global Studio Navigation Bar */}
       <TopNav
-        activeNav={activeNav}
-        setActiveNav={(nav) => {
-          setActiveNav(nav);
-          if (nav === 'video') setFilterType('video');
-          else if (nav === 'image') setFilterType('all');
-        }}
-        onOpenStoryboardBuilder={() => setStoryboardBuilderOpen(true)}
-        onOpenAssetManager={() => setAssetManagerOpen(true)}
-        onOpenAudio={() => setAudioModalOpen(true)}
-        onOpenViralGuide={() => setViralGuideOpen(true)}
-        onOpenGroqModal={() => setGroqModalOpen(true)}
-        onOpenScriptImporter={() => {
-          setScriptSeedText('');
-          setScriptImportOpen(true);
-        }}
-        currentView={currentView}
-        setCurrentView={setCurrentView}
+        activeStep={activeStep}
+        setActiveStep={setActiveStep}
+        onStartNewProject={handleStartNewProject}
+        onOpenSettings={() => setSettingsModalOpen(true)}
+        onPrintStoryboard={() => window.print()}
+        totalShots={prompts.length}
       />
 
-      {currentView === 'admin' ? (
-        /* BACKEND ADMIN VIEW */
-        <div className="flex-1 overflow-y-auto">
-          <AdminDashboard
-            onBackToVisitor={() => {
-              setCurrentView('visitor');
-              fetchPrompts();
-              fetchStats();
-            }}
-          />
-        </div>
-      ) : activeNav === 'explore' ? (
-        /* EXPLORE VIEW */
-        <div className="flex-1 overflow-y-auto pb-32">
-          <ExploreView onUseTemplate={handleUseTemplate} />
-        </div>
-      ) : (
-        /* MAIN STUDIO CANVAS VIEW */
-        <div className="flex-1 flex flex-col min-h-0 relative">
-          {/* Sub-header & Toolbar */}
-          <BoardHeader
-            activeTab={activeBoardTab}
-            setActiveTab={setActiveBoardTab}
-            filterType={filterType}
-            setFilterType={setFilterType}
-            zoomLevel={zoomLevel}
-            setZoomLevel={setZoomLevel}
-            onOpenViralGuide={() => setViralGuideOpen(true)}
-            onOpenGroqModal={() => setGroqModalOpen(true)}
-            onClearBoard={handleClearAllBoard}
-            seriesList={seriesList}
-            selectedSeriesId={selectedSeriesId}
-            onSelectSeries={handleSelectSeries}
-            onDeleteSeries={handleDeleteSeries}
-            onStartNewProject={handleStartNewProject}
-            promptsCount={prompts.length}
-            prompts={prompts}
-            onBatchUpdated={() => {
-              fetchPrompts(selectedSeriesId);
-            }}
-          />
-
-          {/* Canvas & Detail Inspector Split */}
-          <div className="flex-1 flex min-h-0 relative overflow-hidden">
-            {/* Center Canvas Area (Constrains Floating Bar!) */}
-            <div className="flex-1 flex flex-col relative min-w-0">
-              
-              {/* Scrollable Board */}
-              <div className="flex-1 overflow-y-auto pb-44">
-                {loading ? (
-                  <div className="h-full flex flex-col items-center justify-center gap-3 text-stone-500 py-32 font-mono text-xs">
-                    <RefreshCw className="w-6 h-6 animate-spin text-[#F71C25]" />
-                    <span>กำลังโหลด CineBoard Studio...</span>
-                  </div>
-                ) : activeBoardTab === 'board' ? (
-                  <BoardView
-                    prompts={prompts}
-                    selectedItem={selectedItem}
-                    onSelectItem={(p) => setSelectedItem(p)}
-                    onDeletePrompt={handleDeletePrompt}
-                    zoomLevel={zoomLevel}
-                    filterType={filterType}
-                    onOpenGroqModal={() => setGroqModalOpen(true)}
-                    onExploreTab={() => setActiveNav('explore')}
-                    onOpenImageViewer={(p) => {
-                      setSelectedItem(p);
-                      setImageViewerOpen(true);
-                    }}
-                    onOpenVideoStudio={(p) => {
-                      setSelectedItem(p);
-                      setVideoModalOpen(true);
-                    }}
-                  />
-                ) : (
-                  <ProjectHistoryView
-                    seriesList={seriesList}
-                    selectedSeriesId={selectedSeriesId}
-                    onSelectSeries={(id) => {
-                      handleSelectSeries(id);
-                      setActiveBoardTab('board');
-                    }}
-                    onDeleteSeries={handleDeleteSeries}
-                    onSelectItem={(item) => setSelectedItem(item)}
-                    onStoryboardCommitted={handleStoryboardCommitted}
-                    onOpenDirectorWizard={handleStartNewProject}
-                    onSwitchToBoard={() => setActiveBoardTab('board')}
-                  />
-                )}
-              </div>
-
-              {/* Floating Bottom Generation Bar (Docked gracefully in Canvas) */}
-              <div className="absolute bottom-16 md:bottom-5 inset-x-0 flex justify-center px-3 sm:px-4 pointer-events-none z-30">
-                <div className="w-full max-w-3xl pointer-events-auto">
-                  <FloatingPromptBar
-                    onGenerateNewPrompt={handleGenerateNewPrompt}
-                    onStoryboardCommitted={handleStoryboardCommitted}
-                    selectedItem={selectedItem}
-                    onOpenGroqModal={() => setGroqModalOpen(true)}
-                    onOpenScriptImporter={(seed) => {
-                      if (typeof seed === 'string') setScriptSeedText(seed);
-                      setScriptImportOpen(true);
-                    }}
-                    customPromptSeed={customPromptSeed}
-                    selectedSeriesId={selectedSeriesId}
-                    seriesList={seriesList}
-                    onStartNewProject={handleStartNewProject}
-                    onAppendShotToCurrent={handleAppendShotToCurrent}
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* Right Detail Inspector Panel */}
-            {selectedItem && (
-              <DetailInspector
-                item={selectedItem}
-                promptsList={prompts}
-                onClose={() => setSelectedItem(null)}
-                onDeletePrompt={handleDeletePrompt}
-                onSelectOtherItem={handleSelectOtherItem}
-                onOpenVideoModal={() => setVideoModalOpen(true)}
-                onOpenClipEditor={() => setClipEditorOpen(true)}
-                onOpenImageViewer={(item) => {
-                  setSelectedItem(item);
-                  setImageViewerOpen(true);
-                }}
-                onOpenEditShot={() => setEditShotModalOpen(true)}
-                onRecreate={(text) => {
-                  alert('นำเข้าคำสั่ง Prompt สู่ช่องสร้างภาพด้านล่างเรียบร้อยแล้ว! สามารถกด Generate ได้ทันที');
-                }}
-              />
-            )}
-          </div>
-        </div>
+      {/* 2. Sub-Header Toolbar (Shown on Step 2 & 3) */}
+      {activeStep !== 'brief' && (
+        <BoardHeader
+          zoomLevel={zoomLevel}
+          setZoomLevel={setZoomLevel}
+          onClearBoard={handleClearAllBoard}
+          seriesList={seriesList}
+          selectedSeriesId={selectedSeriesId}
+          onSelectSeries={handleSelectSeries}
+          onDeleteSeries={handleDeleteSeries}
+          onStartNewProject={handleStartNewProject}
+          promptsCount={prompts.length}
+          prompts={prompts}
+          onBatchUpdated={() => fetchPrompts(selectedSeriesId)}
+        />
       )}
 
-      {/* Mobile Bottom Navigation Bar (Smartphones) */}
-      <MobileBottomNav
-        activeBoardTab={activeBoardTab}
-        setActiveBoardTab={setActiveBoardTab}
-        onOpenStoryboardBuilder={handleStartNewProject}
-        onOpenAssetManager={() => setAssetManagerOpen(true)}
-        onOpenGroqModal={() => setGroqModalOpen(true)}
-        seriesCount={seriesList.length}
+      {/* 3. Main Workspace Area */}
+      <div className="flex-1 flex min-h-0 relative overflow-hidden">
+        {/* Center Content View */}
+        <div className="flex-1 flex flex-col relative min-w-0 overflow-y-auto">
+          {loading && activeStep !== 'brief' ? (
+            <div className="h-full flex flex-col items-center justify-center gap-3 text-stone-500 py-32 font-mono text-xs">
+              <RefreshCw className="w-6 h-6 animate-spin text-[#F71C25]" />
+              <span>กำลังโหลด CineBoard Studio...</span>
+            </div>
+          ) : activeStep === 'brief' ? (
+            /* STEP 1: BRIEF & SCRIPT CREATOR */
+            <BriefView
+              onStoryboardCreated={handleStoryboardCreated}
+              onGoToBoard={() => setActiveStep('board')}
+            />
+          ) : activeStep === 'shotlist' ? (
+            /* STEP 2: SHOT LIST & BREAKDOWN EDITOR */
+            <ShotListView
+              prompts={prompts}
+              seriesTitle={activeSeries?.title || 'รวมทุกโปรเจกต์สตอรี่บอร์ด'}
+              onEditPrompt={(p) => {
+                setSelectedItem(p);
+                setEditShotModalOpen(true);
+              }}
+              onDeletePrompt={handleDeletePrompt}
+              onAppendShot={() => setActiveStep('brief')}
+              onGoToBoard={() => setActiveStep('board')}
+              onGenerateImageForShot={handleGenerateImageForShot}
+            />
+          ) : (
+            /* STEP 3: STORYBOARD CANVAS BOARD */
+            <BoardView
+              prompts={prompts}
+              selectedItem={selectedItem}
+              onSelectItem={(p) => setSelectedItem(p)}
+              onDeletePrompt={handleDeletePrompt}
+              zoomLevel={zoomLevel}
+              onStartNewProject={handleStartNewProject}
+              onOpenImageViewer={(p) => {
+                setSelectedItem(p);
+                setImageViewerOpen(true);
+              }}
+              onGenerateImageForShot={handleGenerateImageForShot}
+              onEditPrompt={(p) => {
+                setSelectedItem(p);
+                setEditShotModalOpen(true);
+              }}
+            />
+          )}
+        </div>
+
+        {/* Right Detail Inspector (Desktop Only, on Board View) */}
+        {activeStep === 'board' && selectedItem && (
+          <div className="hidden lg:block w-80 xl:w-96 border-l border-stone-200 bg-white overflow-y-auto shadow-xs">
+            <DetailInspector
+              item={selectedItem}
+              onClose={() => setSelectedItem(null)}
+              onDelete={handleDeletePrompt}
+              onOpenEditModal={(p) => {
+                setSelectedItem(p);
+                setEditShotModalOpen(true);
+              }}
+              onGenerateImage={() => handleGenerateImageForShot(selectedItem)}
+              onOpenImageViewer={(p) => {
+                setSelectedItem(p);
+                setImageViewerOpen(true);
+              }}
+              prompts={prompts}
+              onSelectOtherItem={(id) => {
+                const found = prompts.find((p) => p.id === id);
+                if (found) setSelectedItem(found);
+              }}
+            />
+          </div>
+        )}
+      </div>
+
+      {/* 4. Modals */}
+      {/* Settings Modal */}
+      <SettingsModal
+        isOpen={settingsModalOpen}
+        onClose={() => setSettingsModalOpen(false)}
       />
 
-      {/* Storyboard Director & Asset Management Modals */}
-      <StoryboardBuilderModal
-        isOpen={storyboardBuilderOpen}
-        onClose={() => setStoryboardBuilderOpen(false)}
-        initialConcept={customPromptSeed}
-        onOpenAssetManager={() => {
-          setStoryboardBuilderOpen(false);
-          setAssetManagerOpen(true);
-        }}
-        onStoryboardCommitted={handleStoryboardCommitted}
-      />
+      {/* Image Viewer Fullscreen Modal */}
+      {imageViewerOpen && selectedItem && (
+        <ImageViewerModal
+          isOpen={imageViewerOpen}
+          onClose={() => setImageViewerOpen(false)}
+          prompt={selectedItem}
+        />
+      )}
 
-      <AssetManagerModal
-        isOpen={assetManagerOpen}
-        onClose={() => setAssetManagerOpen(false)}
-        onAssetCreated={() => {
-          // Re-fetch or pass through
-        }}
-      />
-
-      {/* Direct Multi-Scene Script Importer Modal */}
-      <ScriptImportModal
-        isOpen={scriptImportOpen}
-        onClose={() => setScriptImportOpen(false)}
-        onStoryboardCommitted={handleStoryboardCommitted}
-        initialScript={scriptSeedText}
-      />
+      {/* Edit Shot Modal */}
+      {editShotModalOpen && selectedItem && (
+        <EditShotModal
+          isOpen={editShotModalOpen}
+          onClose={() => setEditShotModalOpen(false)}
+          shot={selectedItem}
+          onShotUpdated={handleShotUpdated}
+          onGenerateImage={() => handleGenerateImageForShot(selectedItem)}
+        />
+      )}
 
       {/* Delete Confirmation Modal */}
-      <DeleteConfirmModal
-        isOpen={!!deleteModalConfig}
-        title={deleteModalConfig?.title}
-        message={deleteModalConfig?.message}
-        isDeleting={isDeleting}
-        onClose={() => setDeleteModalConfig(null)}
-        onConfirm={deleteModalConfig?.onConfirm}
-      />
-
-      {/* Interactive Modals */}
-      <ImageViewerModal
-        isOpen={imageViewerOpen}
-        onClose={() => setImageViewerOpen(false)}
-        item={selectedItem}
-        onOpenVideoStudio={(itm) => {
-          setSelectedItem(itm);
-          setVideoModalOpen(true);
-        }}
-      />
-
-      <VideoStudioModal
-        isOpen={videoModalOpen}
-        onClose={() => setVideoModalOpen(false)}
-        item={selectedItem}
-      />
-
-      <ClipEditorModal
-        isOpen={clipEditorOpen}
-        onClose={() => setClipEditorOpen(false)}
-        item={selectedItem}
-      />
-
-      <EditShotModal
-        isOpen={editShotModalOpen}
-        onClose={() => setEditShotModalOpen(false)}
-        shot={selectedItem}
-        onSaved={handleShotUpdated}
-      />
-
-      <AudioSimulatorModal
-        isOpen={audioModalOpen}
-        onClose={() => setAudioModalOpen(false)}
-        item={selectedItem}
-      />
-
-      <ProductionGuideModal
-        isOpen={viralGuideOpen}
-        onClose={() => setViralGuideOpen(false)}
-      />
-
-      <GroqScriptModal
-        isOpen={groqModalOpen}
-        onClose={() => setGroqModalOpen(false)}
-        onOpenStoryboardBuilder={(conceptText) => {
-          setCustomPromptSeed(conceptText);
-          setStoryboardBuilderOpen(true);
-        }}
-        onApplyPrompt={(prompt) => {
-          setCustomPromptSeed(prompt);
-          setActiveNav('image');
-          setActiveBoardTab('board');
-        }}
-        onApplyDialogue={(dialogue) => {
-          setAudioModalOpen(true);
-        }}
-      />
+      {deleteModalConfig && (
+        <DeleteConfirmModal
+          isOpen={!!deleteModalConfig}
+          onClose={() => setDeleteModalConfig(null)}
+          title={deleteModalConfig.title}
+          message={deleteModalConfig.message}
+          onConfirm={deleteModalConfig.onConfirm}
+        />
+      )}
     </div>
   );
 }

@@ -147,7 +147,7 @@ export default function EditShotModal({ isOpen, onClose, shot, onSaved }) {
                 <span>ให้ AI ช่วยปรับแก้ช็อตนี้ตามบริบทของเรื่อง (AI Context-Aware Refiner):</span>
               </span>
               <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-[#FBEFC5] text-stone-800 border border-[#E5D7A3]">
-                Groq LPU / Gemini 3.8
+                AI Director Engine
               </span>
             </div>
 
