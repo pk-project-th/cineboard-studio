@@ -365,11 +365,12 @@ app.post('/api/storyboard/ai-plan', async (req, res) => {
   try {
     const {
       story_concept,
-      num_shots = 6,
+      num_shots = 0,
       target_duration = 30,
       pacing = 'normal',
-      style = 'Cinematic Film',
-      visual_style = 'Cinematic Film',
+      style = 'auto',
+      visual_style = 'auto',
+      camera_breakdown = 'auto_story',
       aspect_ratio = '16:9'
     } = req.body;
 
@@ -377,7 +378,7 @@ app.post('/api/storyboard/ai-plan', async (req, res) => {
       return res.status(400).json({ success: false, error: 'กรุณาระบุพล็อตเรื่องหรือคอนเซปต์' });
     }
 
-    const chosenStyle = visual_style || style;
+    const chosenStyle = visual_style || style || 'auto';
 
     // Check if user pasted a structured multi-scene script (Scene 1..N, ฉากที่ 1..N)
     const parsedScript = parseMultiSceneScript(story_concept);
@@ -385,11 +386,19 @@ app.post('/api/storyboard/ai-plan', async (req, res) => {
 
     if (parsedScript && parsedScript.shots && parsedScript.shots.length >= 2) {
       console.log(`[Script Parser] Directly detected ${parsedScript.shots.length} structured scenes from prompt.`);
+      let customStyleEn = '';
+      if (chosenStyle && chosenStyle !== 'auto' && !chosenStyle.includes('อัตโนมัติ')) {
+        customStyleEn = /[\u0E00-\u0E7F]/.test(chosenStyle)
+          ? await aiService.translateToEnglish(chosenStyle)
+          : chosenStyle;
+      }
       const enrichedShots = await Promise.all(parsedScript.shots.map(async (s, idx) => {
         let enPrompt = s.prompt || s.content || s.title || '';
         if (/[\u0E00-\u0E7F]/.test(enPrompt)) {
           const tr = await aiService.translateToEnglish(enPrompt);
-          enPrompt = `${s.camera_angle || 'Cinematic Shot'}, ${tr}, ${parsedScript.visual_style || chosenStyle}, hyper-realistic, crisp details, 8k`;
+          enPrompt = `${s.camera_angle || 'Cinematic Shot'}, ${tr}, ${customStyleEn || parsedScript.visual_style || 'cinematic commercial lighting'}, hyper-realistic, crisp details, 8k`;
+        } else if (customStyleEn) {
+          enPrompt = `${enPrompt}, ${customStyleEn}`;
         }
         return {
           ...s,
@@ -402,7 +411,7 @@ app.post('/api/storyboard/ai-plan', async (req, res) => {
       }));
       planData = {
         project_title: parsedScript.project_title,
-        logline: `สตอรี่บอร์ด ${enrichedShots.length} ฉาก จากบทสคริปต์ (${parsedScript.visual_style || chosenStyle})`,
+        logline: `สตอรี่บอร์ด ${enrichedShots.length} ฉาก จากบทสคริปต์`,
         total_shots: enrichedShots.length,
         total_scenes: enrichedShots.length,
         target_duration: parsedScript.total_duration || target_duration,
@@ -418,6 +427,7 @@ app.post('/api/storyboard/ai-plan', async (req, res) => {
         target_duration,
         pacing,
         visual_style: chosenStyle,
+        camera_breakdown,
         aspect_ratio
       });
     }

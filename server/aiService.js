@@ -347,62 +347,147 @@ async function generateAIImage(prompt, options = {}) {
  */
 async function planStoryboard({
   story_concept,
-  num_shots = 6,
+  num_shots = 0,
   target_duration = 30,
   pacing = 'normal',
-  visual_style = 'Cinematic Film (35mm Commercial)',
+  visual_style = 'auto',
+  camera_breakdown = 'auto_story',
   aspect_ratio = '16:9'
 }) {
-  const reqShots = Math.max(2, Math.min(24, parseInt(num_shots, 10) || 6));
-  const durPerShot = Math.max(1.5, Math.round((target_duration / reqShots) * 10) / 10);
+  return await generateSmartNeuralStoryboard(
+    story_concept,
+    num_shots,
+    target_duration,
+    visual_style,
+    aspect_ratio,
+    camera_breakdown
+  );
+}
 
-  // If user configured Gemini or OpenAI API key, try LLM first
-  if (config.GEMINI_API_KEY || config.OPENAI_API_KEY) {
-    const systemPrompt = `คุณคือผู้กำกับภาพยนตร์และผู้กำกับโฆษณาระดับโลก (Master Film & Commercial Storyboard Director)
-วิเคราะห์บรีฟของผู้ใช้และแตกเป็นสตอรี่บอร์ดจำนวน ${reqShots} ช็อต ที่แตกต่างกันทุกช็อต
-ฟิลด์ "prompt" ต้องเป็นภาษาอังกฤษล้วน (Pure English) สำหรับสร้างภาพ FLUX.1
-ตอบกลับเป็น JSON Object ที่มี project_title, logline, และ shots array`;
-
-    const userPrompt = `บรีฟ: "${story_concept}" จำนวน ${reqShots} ช็อต ความยาว ${target_duration} วินาที สไตล์ ${visual_style} สัดส่วน ${aspect_ratio}`;
-    const result = await callLLMChat(systemPrompt, userPrompt);
-    if (result && Array.isArray(result.shots) && result.shots.length > 0) {
-      result.shots = result.shots.map((s, idx) => ({
-        ...s,
-        shot_number: idx + 1,
-        scene_number: s.scene_number || idx + 1,
-        scene_title: s.scene_title || `ฉากที่ ${idx + 1}`,
-        aspect_ratio,
-        dialogue: sanitizeThaiPolite(s.dialogue || ''),
-        image_url: getStoryboardSketch({ ...s, aspect_ratio, step_number: idx + 1 })
-      }));
-      result.total_shots = result.shots.length;
-      result.target_duration = target_duration;
-      result.total_duration = target_duration;
-      return result;
-    }
+/**
+ * Infer camera angle automatically from Thai/English beat text or camera_breakdown mode
+ */
+function inferBestCameraStage(beatText, index, cameraBreakdown, narrativeStages) {
+  const t = String(beatText || '').toLowerCase();
+  if (/มาโคร|macro|extreme close|ใกล้มาก|พื้นผิว|ตะเข็บ|หยดน้ำ|ปลายนิ้ว|ปุ่ม/.test(t)) {
+    return narrativeStages[2]; // Extreme Close-Up Macro
+  }
+  if (/โคลสอัพ|close-up|closeup|มุมใกล้|ใบหน้า|รอยยิ้ม|แววตา|มือจับ|ถือกล่อง/.test(t)) {
+    return narrativeStages[5]; // Close-Up Reaction / Detail
+  }
+  if (/มุมกว้าง|wide|โชว์รูม|ทั้งคัน|บรรยากาศ|เปิดตัว|สวน|ถนน/.test(t)) {
+    return narrativeStages[0]; // Wide Establishing Shot
+  }
+  if (/มุมต่ำ|มุมเสย|low angle|เคลื่อนตัว|วิ่งออก|ฝากระโปรง|หลังคา/.test(t)) {
+    return narrativeStages[6]; // Low-Angle Hero Tracking
+  }
+  if (/ข้ามไหล่|over-the-shoulder|ots|หน้าจอ|คอนโซล/.test(t)) {
+    return narrativeStages[3]; // Over-The-Shoulder
+  }
+  if (/pov|สายตา|มองดู/.test(t)) {
+    return narrativeStages[4]; // POV
   }
 
-  // Intelligent Neural-Translated Storyboard Director (< 1s response, 100% accurate to user's brief)
-  return await generateSmartNeuralStoryboard(story_concept, reqShots, target_duration, visual_style, aspect_ratio);
+  // Otherwise pick based on chosen cameraBreakdown mode
+  if (cameraBreakdown === 'macro_detail') {
+    const macroOrder = [2, 5, 3, 1, 2, 6, 5, 7];
+    return narrativeStages[macroOrder[index % macroOrder.length]];
+  }
+  if (cameraBreakdown === 'cinematic_story') {
+    const cineOrder = [0, 1, 3, 5, 6, 7, 1, 5];
+    return narrativeStages[cineOrder[index % cineOrder.length]];
+  }
+  if (cameraBreakdown === 'dynamic_angles') {
+    const dynOrder = [4, 2, 6, 1, 5, 7, 3, 2];
+    return narrativeStages[dynOrder[index % dynOrder.length]];
+  }
+
+  return narrativeStages[index % narrativeStages.length];
+}
+
+/**
+ * Resolve Auto or Custom Visual Style & Lighting into English for Image Generation
+ */
+async function resolveVisualStyle(styleInput, rawConcept) {
+  // Check if user pasted a Visual Style line inside their prompt
+  const embeddedMatch = String(rawConcept || '').match(/visual\s*style(?:\s*reference)?[^:\n]*:\s*([^\r\n]+)/i);
+  if (embeddedMatch && embeddedMatch[1].trim()) {
+    const extracted = embeddedMatch[1].trim();
+    return /[\u0E00-\u0E7F]/.test(extracted) ? await translateToEnglish(extracted) : extracted;
+  }
+
+  const cleanStyle = String(styleInput || '').trim();
+  if (!cleanStyle || cleanStyle === 'auto' || cleanStyle.includes('อัตโนมัติ')) {
+    const text = String(rawConcept || '').toLowerCase();
+    if (/asmr|มาโคร|macro|craftsmanship|สัมผัส/.test(text)) {
+      return 'macro photography, hyper-realistic, soft natural daylight, premium commercial style, sharp tactile details';
+    }
+    if (/รถ|โชว์รูม|mazda|ev|car|suv|ส่งมอบรถ/.test(text)) {
+      return 'high-end automotive commercial photography, sleek showroom & golden hour lighting, glossy reflections, photorealistic 8k';
+    }
+    if (/เซรั่ม|ครีม|ผิว|บิวตี้|สกินแคร์|skin|serum|beauty/.test(text)) {
+      return 'luxury skincare beauty commercial, soft diffused morning sunlight, dewy glass skin texture, clean minimalist studio';
+    }
+    if (/คาเฟ่|กาแฟ|มัทฉะ|อาหาร|ขนม|เครื่องดื่ม|cafe|food/.test(text)) {
+      return 'warm natural window daylight, appetizing lifestyle food cinematography, shallow depth of field, rich organic colors';
+    }
+    return 'high-end cinematic commercial photography, natural volumetric lighting, shallow depth of field, hyper-realistic 8k';
+  }
+
+  // If user typed custom Thai or English style, translate any Thai to English
+  if (/[\u0E00-\u0E7F]/.test(cleanStyle)) {
+    const tr = await translateToEnglish(cleanStyle);
+    return `${tr}, photorealistic, high detail`;
+  }
+  return cleanStyle;
 }
 
 /**
  * Smart Neural Storyboard Director
- * Breaks user's Thai/English brief or bullet points into distinct cinematic shots
- * and translates each beat into a rich, accurate English visual prompt for FLUX.1
+ * Automatically breaks user's Thai/English brief into distinct cinematic shots by story beats & camera angles
  */
-async function generateSmartNeuralStoryboard(concept, count, totalDuration, style, aspect_ratio) {
-  const durPerShot = Math.max(1.5, Math.round((totalDuration / count) * 10) / 10);
+async function generateSmartNeuralStoryboard(
+  concept,
+  requestedCount,
+  totalDuration,
+  style,
+  aspect_ratio,
+  camera_breakdown = 'auto_story'
+) {
   const rawText = String(concept || '').trim();
+  const resolvedStyleEn = await resolveVisualStyle(style, rawText);
 
   // Extract meaningful lines / bullets / sentences from user's input
-  const rawLines = rawText
+  let rawLines = rawText
     .split(/\r?\n/)
     .map(l => l.replace(/^[\s\-•*🎬🎥✨🚗🎧📱#]+/, '').trim())
     .filter(l => l.length > 2 && !/^visual\s*style/i.test(l));
 
-  const mainTitle = (rawLines[0] || rawText || 'โปรเจกต์สตอรี่บอร์ดใหม่').replace(/^[🎬🎥✨🚗🎧📱#\s*-]+/, '').slice(0, 60);
-  const bodyBeats = rawLines.length > 1 ? rawLines.slice(1) : rawLines;
+  // If user typed a single block/paragraph without newlines, split by sentences or clauses
+  if (rawLines.length === 1 && rawLines[0].length > 70) {
+    const splitClauses = rawLines[0]
+      .split(/(?:[\.!?;]\s+|\s+(?:แล้ว|จากนั้น|ต่อมา|และให้เห็น|ตัดภาพไปที่|ตามด้วย)\s+)/)
+      .map(s => s.trim())
+      .filter(s => s.length > 4);
+    if (splitClauses.length >= 2) {
+      rawLines = [rawLines[0].slice(0, 50), ...splitClauses];
+    }
+  }
+
+  const mainTitle = (rawLines[0] || rawText || 'โปรเจกต์สตอรี่บอร์ดใหม่')
+    .replace(/^[🎬🎥✨🚗🎧📱#\s*\d.)\-]+/, '')
+    .slice(0, 65);
+  const bodyBeats = rawLines.length > 1 ? rawLines.slice(1) : [];
+
+  // Automatic shot count: if user wrote multiple beats/lines, match them 1-to-1; otherwise create a complete 6-angle story arc
+  const count =
+    bodyBeats.length >= 2
+      ? Math.min(20, bodyBeats.length)
+      : requestedCount && requestedCount >= 2
+      ? requestedCount
+      : 6;
+
+  const durPerShot = 3.0;
 
   // Translate the main topic and all beats to English in a SINGLE batch request (~200ms total)
   const batchText = [mainTitle, ...bodyBeats].join('\n');
@@ -497,12 +582,12 @@ async function generateSmartNeuralStoryboard(concept, count, totalDuration, styl
 
   const shots = [];
   for (let i = 0; i < count; i++) {
-    const stage = narrativeStages[i % narrativeStages.length];
+    const hasSpecificBeat = bodyBeats.length >= 2 && i < bodyBeats.length;
+    const rawBeatTh = hasSpecificBeat ? bodyBeats[i].replace(/^\d+[\.\)]\s*/, '').trim() : '';
+    const stage = inferBestCameraStage(rawBeatTh, i, camera_breakdown, narrativeStages);
     const shotNum = i + 1;
 
-    // Determine if the user provided a specific beat for this index
-    const hasSpecificBeat = bodyBeats.length > 1 && i < bodyBeats.length;
-    const beatTh = hasSpecificBeat ? bodyBeats[i] : stage.stageTh(mainTitle);
+    const beatTh = hasSpecificBeat ? rawBeatTh : stage.stageTh(mainTitle);
     const beatEn = hasSpecificBeat ? `${mainTopicEn}, ${translatedBeats[i]}` : stage.stageEn(mainTopicEn);
 
     const shortTitleTh = hasSpecificBeat
@@ -519,12 +604,12 @@ async function generateSmartNeuralStoryboard(concept, count, totalDuration, styl
       camera_movement: stage.move,
       lens_focal: stage.lens,
       action_description: hasSpecificBeat
-        ? `${beatTh} — ถ่ายทำด้วยมุมกล้อง ${stage.th} (${stage.lens}) เคลื่อนกล้องแบบ ${stage.move}`
+        ? `${beatTh} (${stage.th} • ${stage.lens})`
         : beatTh,
       dialogue: stage.vo(mainTitle),
       audio_foley: stage.foley,
       on_screen_text: shotNum === count ? mainTitle.slice(0, 35) : '',
-      prompt: `${stage.angle}, ${stage.lens} lens, ${beatEn}, ${style}, cinematic commercial lighting, hyper-realistic, crisp details, 8k`,
+      prompt: `${stage.angle}, ${stage.lens} lens, ${beatEn}, ${resolvedStyleEn}, hyper-realistic, crisp details, 8k`,
       video_prompt: `${stage.move} camera movement, ${stage.angle} of ${beatEn}, smooth 60fps cinematic motion, photorealistic`,
       duration_seconds: durPerShot,
       aspect_ratio: aspect_ratio
@@ -536,10 +621,10 @@ async function generateSmartNeuralStoryboard(concept, count, totalDuration, styl
 
   return {
     project_title: mainTitle,
-    logline: `สตอรี่บอร์ด ${count} ช็อต ถ่ายทอดเรื่องราว "${mainTitle}" ในสไตล์ ${style}`,
+    logline: `สตอรี่บอร์ด ${count} ช็อต ถ่ายทอดเรื่องราว "${mainTitle}"`,
     total_shots: count,
-    total_duration: totalDuration,
-    target_duration: totalDuration,
+    total_duration: count * durPerShot,
+    target_duration: count * durPerShot,
     shots
   };
 }
