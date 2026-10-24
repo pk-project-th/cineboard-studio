@@ -4,62 +4,63 @@
 
 @layer base {
   body {
-    @apply bg-[#FAF9F5] text-[#18181B] font-sans antialiased selection:bg-[#F71C25]/20 selection:text-[#F71C25];
+    @apply bg-[#0B0D11] text-[#F1F5F9] font-sans antialiased selection:bg-amber-500/30 selection:text-amber-200;
   }
 }
 
-/* Brand Palette: Red Orange (#F71C25) & Beeswax (#FBEFC5) */
-.bg-red-orange {
-  background-color: #F71C25;
-}
-
-.text-red-orange {
-  color: #F71C25;
-}
-
-.bg-beeswax {
-  background-color: #FBEFC5;
-}
-
-.border-beeswax {
-  border-color: #F0E2AF;
-}
-
-/* Red Orange to Beeswax Gradient (Pantone 1788 C -> Pantone 7499 C) */
-.gradient-red-beeswax {
-  background: linear-gradient(135deg, #F71C25 0%, #FF5A36 45%, #FBEFC5 100%);
-}
-
-.gradient-beeswax-soft {
-  background: linear-gradient(180deg, #FFFFFF 0%, #FCF8EE 100%);
-}
-
-/* Editorial Studio Card Styling */
-.vintage-panel,
-.editorial-card {
-  background: #FFFFFF;
-  border: 1px solid rgba(228, 228, 231, 0.9);
-  box-shadow: 0 4px 18px -4px rgba(24, 24, 27, 0.05);
-}
-
-.vintage-panel:hover,
-.editorial-card:hover {
-  border-color: rgba(247, 28, 37, 0.4);
-  box-shadow: 0 10px 25px -4px rgba(247, 28, 37, 0.08);
-}
-
-/* Custom scrollbar for clean light canvas */
+/* Custom Scrollbar for Dark Studio Canvas */
 ::-webkit-scrollbar {
   width: 7px;
   height: 7px;
 }
 ::-webkit-scrollbar-track {
-  background: #F4F4F5;
+  background: #0F1218;
 }
 ::-webkit-scrollbar-thumb {
-  background: #D4D4D8;
+  background: #262C3A;
   border-radius: 4px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #A1A1AA;
+  background: #3B4459;
+}
+
+/* Studio Card Surface */
+.studio-card {
+  background: #131720;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 8px 24px -6px rgba(0, 0, 0, 0.45);
+  transition: border-color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.studio-card:hover {
+  border-color: rgba(245, 158, 11, 0.35);
+  box-shadow: 0 12px 32px -6px rgba(0, 0, 0, 0.65);
+}
+
+/* Shimmer animation for AI rendering */
+@keyframes pulseGlow {
+  0%, 100% { opacity: 0.55; }
+  50% { opacity: 1; }
+}
+
+.ai-rendering-glow {
+  animation: pulseGlow 1.8s ease-in-out infinite;
+}
+
+/* Clean Print Layout */
+@media print {
+  body {
+    background: #FFFFFF !important;
+    color: #000000 !important;
+  }
+  .no-print {
+    display: none !important;
+  }
+  .studio-card {
+    background: #FFFFFF !important;
+    border: 1px solid #D4D4D8 !important;
+    box-shadow: none !important;
+    color: #000000 !important;
+    break-inside: avoid;
+  }
 }

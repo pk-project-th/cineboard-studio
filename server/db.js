@@ -100,48 +100,6 @@ promptMigrations.forEach(stmt => {
   try { db.exec(stmt); } catch (e) { /* Column already exists */ }
 });
 
-// Seed starter assets if empty
-try {
-  const assetCount = db.prepare('SELECT COUNT(*) as count FROM assets').get();
-  if (assetCount.count === 0) {
-    const insertAsset = db.prepare(`
-      INSERT INTO assets (id, name, type, description, prompt, image_url)
-      VALUES (?, ?, ?, ?, ?, ?)
-    `);
-
-    insertAsset.run(
-      'asset-char-sak',
-      'ศักดิ์ (พระเอกชุดซูเปอร์ฮีโร่บ้านๆ)',
-      'character',
-      'หนุ่มช่างแอร์ สวมชุดซูเปอร์ฮีโร่ทำเองจากโฟมและถังสี หน้าซื่อจริงจัง deadpan',
-      '1980s Thai comedy superhero character, skinny Thai man wearing handmade colorful robot armor made of painted plastic buckets and cardboard, deadpan stoic facial expression, 16mm film photo.',
-      '/media/tpl_aircon_hero.jpg'
-    );
-
-    insertAsset.run(
-      'asset-scene-market',
-      'ตลาดสดคลองเตยยามเช้า (1980s)',
-      'scene',
-      'ตลาดสดพื้นแฉะ แผงขายผัก ผลไม้ ร่มหลากสี ป้ายโฆษณาเขียนมือแบบวินเทจ',
-      '1980s bustling Bangkok wet market in the morning, colorful market umbrellas, wet concrete ground, wooden stalls with fresh vegetables, vintage hand-painted Thai signs, warm morning sunlight, 16mm celluloid grain.',
-      '/media/tpl_swat_market.jpg'
-    );
-
-    insertAsset.run(
-      'asset-prod-drink',
-      'น้ำส้มไบเล่ขวดแก้ววินเทจ (สินค้าสปอนเซอร์)',
-      'product',
-      'ขวดแก้วน้ำส้มโบราณ ฉลากสีส้มเหลืองพิมพ์ลายนูน มีหยดน้ำเกาะเย็นฉ่ำ วางเด่นในช็อตโฆษณา',
-      'Vintage 1980s Thai glass orange soda bottle, condensation droplets dripping, bright retro label, cinematic studio lighting, commercial hero product shot, expired 35mm film aesthetic.',
-      '/media/tpl_wukong_motorcycle.jpg'
-    );
-
-    console.log('[DB] Seeded starter storyboard assets (character, scene, product).');
-  }
-} catch (e) {
-  console.warn('[DB Asset Seed Warning]:', e.message);
-}
-
 console.log('Database initialized successfully at:', dbPath);
 
 module.exports = db;

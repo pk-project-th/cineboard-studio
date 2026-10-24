@@ -1,324 +1,395 @@
-import React, { useState } from 'react';
-import { Sparkles, Film, Clock, Ratio, Layers, ArrowRight, Loader2, CheckCircle2 } from 'lucide-react';
-import confetti from 'canvas-confetti';
+import React, { useState, useMemo } from 'react';
+import {
+  Sparkles,
+  FileText,
+  Wand2,
+  Edit3,
+  Film,
+  Layers,
+  Ratio,
+  CheckCircle2,
+  RefreshCw,
+  AlertCircle
+} from 'lucide-react';
 
-const SAMPLE_PRESETS = [
+const PRESET_TEMPLATES = [
   {
-    label: '🚗 ส่งมอบรถสปอร์ตหรู (Mazda CX-6e)',
-    concept: `บรรยากาศส่งมอบรถยนต์สปอร์ตระดับพรีเมียม Mazda CX-6e ในโชว์รูมสไตล์โมเดิร์น
-- เซลล์แต่งกายเนี้ยบเดินนำลูกค้ามาที่ตัวรถ อธิบายฟังก์ชั่นห้องโดยสาร หน้าจอ และค็อกพิท
-- ลูกค้าสัมผัสพวงมาลัยหนังแท้ กดปุ่มควบคุม รอยยิ้มพึงพอใจ
-- เซลล์ส่งมอบกล่องกุญแจสมาร์ทคีย์สุดหรู ลูกค้ารับกุญแจพร้อมดอกไม้
-- ช็อตรถขับออกจากโชว์รูมอย่างสง่างามสู่แสงแดดยามเย็น`
+    id: 'mazda_cx6e',
+    badge: '🚗 ส่งมอบรถ Mazda CX-6e',
+    mode: 'brief',
+    style: 'Commercial Luxury',
+    aspect: '16:9',
+    shots: 6,
+    text: `ส่งมอบรถยนต์ไฟฟ้าพรีเมียม Mazda CX-6e ในโชว์รูมหรู
+1. เปิดตัวรถ Mazda CX-6e คลุมผ้าซาตินสีดำในโชว์รูมกระจก แสงไฟสะท้อนหรูหรา
+2. พนักงานขายค่อยๆ ดึงผ้าคลุมออก เผยให้เห็นไฟหน้า LED ดีไซน์โฉบเฉี่ยวและกระจังหน้าเรืองแสง
+3. พนักงานขายถือกล่องกุญแจหนังส่งมอบให้ลูกค้าด้วยรอยยิ้มอบอุ่น
+4. ลูกค้าหญิงยิ้มดีใจ รับกุญแจสมาร์ทคีย์และถ่ายรูปร่วมกับครอบครัวหน้ารถติดโบว์แดง
+5. มุมใกล้ภายในห้องโดยสาร มือสัมผัสพวงมาลัยหนังแท้และหน้าจอดิจิทัล روشنขึ้น
+6. รถยนต์ไฟฟ้า Mazda CX-6e เคลื่อนตัวออกจากโชว์รูมสู่ถนนยามเย็น แสงอาทิตย์สีทองสะท้อนตัวถังเงางาม`
   },
   {
-    label: '🎬 ASMR งานประกอบญี่ปุ่น (Japanese Craftsmanship)',
-    concept: `🎬 Content: Pure ASMR "The Sound of Japanese Craftsmanship"
-Visual Style: Macro photography, extremely detailed, soft natural daylight, premium commercial style.
+    id: 'pure_asmr_8',
+    badge: '🎧 Pure ASMR 8 ฉาก',
+    mode: 'script',
+    style: 'Macro ASMR Photography',
+    aspect: '16:9',
+    shots: 8,
+    text: `🎬 Content 1: Pure ASMR “The Sound of Japanese Craftsmanship”
+Visual Style Reference: macro photography, hyper-realistic, soft natural daylight, premium automotive commercial style, sharp details.
 
-Scene 1: Smart Access
-Prompt: Extreme close-up shot of a hand holding a sleek luxury car key approaching the door handle. Soft daylight, hyper-realistic, shallow depth of field.
+Scene 1: เปิดพอร์ตชาร์จ (Charging Port)
+Prompt: Macro close-up shot. A finger gently opening the sleek charging port door of a modern premium electric vehicle. Soft natural daylight reflecting on the glossy paint. High-end automotive photography, hyper-realistic.
 
-Scene 2: Center Screen Film
-Prompt: Macro shot. A hand slowly peeling off the clear protective film from the glossy digital display inside a luxury vehicle. Crisp reflection.
+Scene 2: ปลดล็อกฝากระโปรง (The Hood)
+Prompt: Medium close-up shot from a low angle. A hand gently lifting the front hood of a sleek modern SUV. Focus on the solid mechanical joints and metallic texture. Cinematic lighting, photorealistic.
 
-Scene 3: Tactile Controls
-Prompt: Extreme close-up. A finger rotating a knurled metallic climate control dial on the dashboard with solid mechanical click feel.
+Scene 3: เสียงปิดประตู (The Solid Thud)
+Prompt: Medium shot from the outside. A hand pushing a heavy, glossy SUV car door fully closed. The car has a deep, rich paint finish reflecting the modern surroundings. Premium automotive commercial style.
 
-Scene 4: Leather & Stitching
-Prompt: Macro shot. A hand gently tracing the hand-crafted stitching on a soft leather steering wheel with warm natural sunlight.
+Scene 4: สัมผัสพวงมาลัย (Japanese Craftsmanship)
+Prompt: Extreme close-up shot. A hand gently tracing the perfect stitching on a soft premium black leather steering wheel inside a luxury car. Warm natural sunlight filtering through the window, highlighting the rich texture. Japanese craftsmanship concept.
 
-Scene 5: The Solid Thud
-Prompt: Medium shot from exterior. A hand pushing the heavy glossy car door shut with a deep solid sound. Cinematic reflections.`
+Scene 5: แป้นควบคุม (Center Commander)
+Prompt: Macro shot. A finger rotating a premium metallic control dial on a luxury car's center console. Elegant interior, soft ambient lighting highlighting the brushed metal texture, highly detailed and precise.
+
+Scene 6: ปุ่มปรับแอร์ (Human-Centric Design)
+Prompt: Close-up shot. A finger turning a high-quality climate control knob on a modern car dashboard. Minimalist and elegant interior design, soft lighting, hyper-realistic.
+
+Scene 7: หลังคาแก้ว (Panoramic Sunroof)
+Prompt: Medium shot looking up from the back seat. A panoramic glass sunroof sliding open, revealing a clear blue sky. Bright natural light flooding into a premium car cabin with leather seats.
+
+Scene 8: เปิดระบบ EV (Boot-up Screen)
+Prompt: Macro shot. A glowing, futuristic digital dashboard instrument cluster in a modern electric vehicle waking up. Dark elegant cabin, high contrast, cinematic lighting, modern technology concept.`
   },
   {
-    label: '✨ รีวิวเซรั่มผิวฉ่ำโกลว์ (Beauty Skincare)',
-    concept: `โฆษณาเซรั่มบำรุงผิวหน้าสูตรไฮยาลูรอนเข้มข้น ฟื้นฟูผิวหมองคล้ำ ฉ่ำวาว Glass Skin ใน 7 วัน
-- เปิดด้วยช็อตหยดเซรั่มใสลงบนผิวสัมผัสเนียนนุ่ม สโลว์โมชั่น 120fps
-- ตัวแบบหญิงสาวผิวสวยยิ้มอย่างมั่นใจกลางแสงแดดธรรมชาติ
-- กราฟิกโมเลกุลซึมลึกสู่ผิวหน้า และเปรียบเทียบผลลัพธ์ผิวกระจ่างใสสุขภาพดี
-- ปิดท้ายด้วยขวดเซรั่มวางเคียงคู่ดอกไม้สีขาวสะอาดตาพร้อมข้อความสั่งซื้อ`
+    id: 'glass_skin',
+    badge: '✨ โฆษณาเซรั่ม Glass Skin',
+    mode: 'brief',
+    style: 'Commercial Luxury',
+    aspect: '9:16',
+    shots: 6,
+    text: `โฆษณาเซรั่มบำรุงผิวหน้า Glass Skin พรีเมียม
+1. ขวดเซรั่มแก้วใสวางบนผิวน้ำที่มีคลื่นเบาๆ แสงแดดเช้าส่องประกายระยิบระยับ
+2. ดรอปเปอร์หยดเนื้อเซรั่มใสเข้มข้นลงบนหลังมือ ภาพมาโครเห็นความชุ่มชื้นชัดเจน
+3. นางแบบสาวผิวใสเกลี่ยเนื้อเซรั่มลงบนแก้มอย่างนุ่มนวล แสงธรรมชาติอบอุ่น
+4. ภาพโคลสอัพผิวหน้าที่ดูฉ่ำวาว อิ่มน้ำ สุขภาพดีหลังทาเสร็จ
+5. นางแบบยิ้มมั่นใจหน้ากระจกในห้องแต่งตัวมินิมอลแสงคลีน
+6. ช็อตจบสินค้าขวดเซรั่มคู่กับหยดน้ำและดอกไม้สีขาว พร้อมพื้นที่วางโลโก้แบรนด์`
   },
   {
-    label: '📱 คลิปไวรัลสั้น TikTok (15 วิ ขายของ)',
-    concept: `คลิปไวรัล TikTok 15 วินาที สเปรย์โฟมทำความสะอาดอเนกประสงค์
-- วินาทีที่ 0-3 (Hook): ภาพกระทะไหม้ดำปี๋ โดนฉีดโฟมขาวฟู่ฟูเต็มหน้าจอ
-- วินาทีที่ 4-8 (Demo): ใช้ผ้าเช็ดเบาๆ คราบดำหลุดออกหมดในปาดเดียว โชว์พื้นผิวมันเงาเหมือนใหม่
-- วินาทีที่ 9-12 (Multi-Use): เช็ดขอบเตาแก๊ส คราบน้ำมันบนไมโครเวฟ สะอาดกริ๊บ
-- วินาทีที่ 13-15 (CTA): ชี้ตะกร้าเหลืองมุมซ้ายล่าง จัดโปร 1 แถม 1 สั่งด่วนก่อนหมด`
+    id: 'tiktok_viral',
+    badge: '🔥 คลิปสั้นไวรัล TikTok',
+    mode: 'brief',
+    style: 'Cinematic Film',
+    aspect: '9:16',
+    shots: 4,
+    text: `คลิปสั้นไวรัล รีวิวคาเฟ่ลับเปิดใหม่สไตล์ญี่ปุ่นในกรุงเทพฯ
+1. เปิดด้วยช็อตเดินผลักประตูไม้โบราณเข้าไปเจอสวนญี่ปุ่นสีเขียวร่มรื่นกลางกรุง
+2. บาริสต้ากำลังตีมัทฉะเกรดพรีเมียมในถ้วยเซรามิกทำมือและเทลงบนนมสดแยกชั้นสวยงาม
+3. ช็อตตักเค้กมัทฉะลาวาเยิ้มๆ น่ากินแบบ Extreme Close-up
+4. ลูกค้านั่งจิบกาแฟริมหน้าต่างไม้กระจกกลม แสงแดดบ่ายส่องอบอุ่น บรรยากาศเหมือนอยู่เกียวโต`
   }
 ];
 
-const STYLES = [
-  { id: 'Cinematic Film', label: '🎬 Cinematic Film (ภาพยนตร์ 35mm)' },
-  { id: 'Photorealistic Commercial', label: '📸 Real Commercial (โฆษณาสมจริง)' },
-  { id: 'Pencil Sketch Storyboard', label: '✏️ Pencil Sketch (ภาพสเก็ตช์สตอรี่บอร์ด)' },
-  { id: 'Anime Studio', label: '🎨 Anime / Animation (อนิเมะสตูดิโอ)' }
+const VISUAL_STYLES = [
+  { id: 'Commercial Luxury', label: '✨ โฆษณาพรีเมียม (Commercial Luxury)' },
+  { id: 'Macro ASMR Photography', label: '🔍 มาโครคมชัดสูง (Macro ASMR)' },
+  { id: 'Cinematic Film', label: '🎬 ภาพยนตร์ (Cinematic 35mm)' },
+  { id: 'Warm Natural Lifestyle', label: '☀️ แสงธรรมชาติอบอุ่น (Lifestyle)' },
+  { id: 'Neon Cyberpunk', label: '🌃 นีออนอนาคต (Futuristic / EV)' },
+  { id: '3D Animation Pixar', label: '🧸 แอนิเมชัน 3 มิติ (3D Pixar)' }
 ];
 
-export default function BriefView({ onStoryboardCreated, onGoToBoard }) {
-  const [concept, setConcept] = useState('');
-  const [visualStyle, setVisualStyle] = useState('Cinematic Film');
+export default function BriefView({
+  onPlanAndAutoRender,
+  onPlanForReview,
+  isPlanning = false
+}) {
+  const [inputMode, setInputMode] = useState('brief'); // 'brief' | 'script'
+  const [storyConcept, setStoryConcept] = useState(PRESET_TEMPLATES[1].text);
+  const [visualStyle, setVisualStyle] = useState('Macro ASMR Photography');
   const [aspectRatio, setAspectRatio] = useState('16:9');
-  const [shotCount, setShotCount] = useState(6);
-  const [duration, setDuration] = useState(30);
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [statusMsg, setStatusMsg] = useState('');
+  const [numShots, setNumShots] = useState(8);
+  const [errorMsg, setErrorMsg] = useState('');
 
-  const handleGenerate = async () => {
-    if (!concept.trim()) {
-      alert('กรุณากรอกพล็อตเรื่อง หรือ วางสคริปต์ฉากก่อนครับ');
+  // Auto-detect scene count when user pastes Scene 1..N or numbered lines
+  const detectedScenesCount = useMemo(() => {
+    if (!storyConcept.trim()) return 0;
+    const sceneMatches = storyConcept.match(/(?:Scene|SCENE|ฉากที่|ช็อตที่|Shot|SHOT)\s*\d+/g);
+    if (sceneMatches && sceneMatches.length >= 2) {
+      return sceneMatches.length;
+    }
+    const numberedLines = storyConcept
+      .split('\n')
+      .map((l) => l.trim())
+      .filter((l) => /^\d+[\.\)]\s+.+/.test(l));
+    if (numberedLines.length >= 2) {
+      return numberedLines.length;
+    }
+    return 0;
+  }, [storyConcept]);
+
+  const handleApplyPreset = (preset) => {
+    setInputMode(preset.mode);
+    setStoryConcept(preset.text);
+    setVisualStyle(preset.style);
+    setAspectRatio(preset.aspect);
+    setNumShots(preset.shots);
+    setErrorMsg('');
+  };
+
+  const handleSubmit = async (reviewFirst = false) => {
+    if (!storyConcept.trim()) {
+      setErrorMsg('กรุณาพิมพ์บรีฟหรือวางบทสคริปต์ก่อนครับ');
       return;
     }
+    setErrorMsg('');
+    const effectiveShots = detectedScenesCount >= 2 ? detectedScenesCount : numShots;
+    const payload = {
+      story_concept: storyConcept.trim(),
+      num_shots: effectiveShots,
+      target_duration: effectiveShots * 3,
+      pacing: 'normal',
+      visual_style: visualStyle,
+      aspect_ratio: aspectRatio
+    };
 
-    setIsGenerating(true);
-    setStatusMsg('🎬 AI ผู้กำกับกำลังวิเคราะห์และจัดวางช็อตสตอรี่บอร์ด...');
-
-    try {
-      const res = await fetch('/api/storyboard/ai-plan', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          story_concept: concept,
-          num_shots: shotCount,
-          target_duration: duration,
-          visual_style: visualStyle,
-          aspect_ratio: aspectRatio
-        })
-      });
-
-      const data = await res.json();
-      if (!data.success || !data.data || !data.data.shots) {
-        throw new Error(data.error || 'ไม่สามารถสร้างสตอรี่บอร์ดได้');
-      }
-
-      const planData = data.data;
-      setStatusMsg(`กำลังบันทึก ${planData.shots.length} ช็อตลงในระบบ...`);
-
-      // Commit into database
-      const commitRes = await fetch('/api/storyboard/commit-shots', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          shots: planData.shots,
-          project_title: planData.project_title,
-          visual_style: visualStyle,
-          target_duration: duration,
-          aspect_ratio: aspectRatio
-        })
-      });
-
-      const commitData = await commitRes.json();
-      if (commitData.success && commitData.data) {
-        confetti({
-          particleCount: 50,
-          spread: 70,
-          origin: { y: 0.7 },
-          colors: ['#F71C25', '#FF4D4D', '#FBEFC5']
-        });
-
-        if (onStoryboardCreated) {
-          onStoryboardCreated({
-            series_id: commitData.series_id,
-            project_title: planData.project_title,
-            data: commitData.data
-          });
-        }
-      } else {
-        throw new Error(commitData.error || 'บันทึกช็อตไม่สำเร็จ');
-      }
-    } catch (err) {
-      console.error(err);
-      alert('เกิดข้อผิดพลาด: ' + err.message);
-    } finally {
-      setIsGenerating(false);
-      setStatusMsg('');
+    if (reviewFirst) {
+      await onPlanForReview(payload);
+    } else {
+      await onPlanAndAutoRender(payload);
     }
   };
 
   return (
-    <div className="max-w-4xl mx-auto p-4 sm:p-8 space-y-6">
-      {/* Header Banner */}
-      <div className="bg-white rounded-3xl p-6 sm:p-8 border border-stone-200/90 shadow-sm space-y-3">
-        <div className="flex items-center gap-2 text-xs font-mono font-bold text-[#F71C25] uppercase tracking-wider">
-          <Sparkles className="w-4 h-4" />
-          <span>ขั้นตอนที่ 1 • กำหนดเรื่องราว & สคริปต์</span>
+    <aside className="w-full lg:w-[370px] xl:w-[395px] shrink-0 bg-[#10131B] border-b lg:border-b-0 lg:border-r border-slate-800/90 flex flex-col lg:h-[calc(100vh-3.5rem)] lg:sticky lg:top-14 overflow-y-auto no-print">
+      <div className="p-4 sm:p-5 space-y-4 flex-1">
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-sm font-extrabold text-white flex items-center gap-2">
+              <Wand2 className="w-4 h-4 text-amber-400" />
+              <span>ผู้กำกับสตอรี่บอร์ด AI</span>
+            </h2>
+            <p className="text-[11px] text-slate-400 mt-0.5">
+              พิมพ์บรีฟภาษาไทย หรือวางบท Scene 1..N เพื่อสร้างภาพจริงทันที
+            </p>
+          </div>
+          {detectedScenesCount >= 2 && (
+            <span className="px-2 py-1 rounded-lg bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-[11px] font-bold flex items-center gap-1">
+              <CheckCircle2 className="w-3.5 h-3.5" />
+              <span>พบ {detectedScenesCount} ฉาก</span>
+            </span>
+          )}
         </div>
-        <h1 className="text-xl sm:text-2xl font-extrabold text-stone-900 tracking-tight">
-          สร้างสตอรี่บอร์ดใหม่ด้วย AI Director
-        </h1>
-        <p className="text-xs sm:text-sm text-stone-600 leading-relaxed max-w-2xl">
-          พิมพ์ไอเดีย บรีฟโฆษณา หรือวางสคริปต์ฉาก (Scene 1..N) ระบบจะจัดวางมุมกล้อง การเคลื่อนไหว บทพูด เสียง Foley และคำสั่งสร้างภาพให้ครบทุกช็อต
-        </p>
+
+        {/* Mode Switcher */}
+        <div className="grid grid-cols-2 gap-1.5 p-1 bg-[#0B0D11] rounded-xl border border-slate-800">
+          <button
+            type="button"
+            onClick={() => setInputMode('brief')}
+            className={`flex items-center justify-center gap-1.5 py-2 px-2.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+              inputMode === 'brief'
+                ? 'bg-slate-800 text-amber-300 border border-amber-500/30 shadow-xs'
+                : 'text-slate-400 hover:text-white'
+            }`}
+          >
+            <Sparkles className="w-3.5 h-3.5" />
+            <span>AI คิดช็อตจากบรีฟ</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setInputMode('script')}
+            className={`flex items-center justify-center gap-1.5 py-2 px-2.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+              inputMode === 'script'
+                ? 'bg-slate-800 text-amber-300 border border-amber-500/30 shadow-xs'
+                : 'text-slate-400 hover:text-white'
+            }`}
+          >
+            <FileText className="w-3.5 h-3.5" />
+            <span>วางบท Scene 1..N</span>
+          </button>
+        </div>
 
         {/* Quick Presets */}
-        <div className="pt-2 space-y-2">
-          <span className="text-[11px] font-mono font-bold text-stone-500">เลือกตัวอย่างไอเดียยอดนิยม:</span>
-          <div className="flex flex-wrap gap-2">
-            {SAMPLE_PRESETS.map((preset, idx) => (
+        <div className="space-y-1.5">
+          <div className="text-[11px] font-semibold text-slate-400 flex items-center justify-between">
+            <span>ตัวอย่างพร้อมใช้ (คลิกเพื่อลองทันที):</span>
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {PRESET_TEMPLATES.map((preset) => (
               <button
-                key={idx}
+                key={preset.id}
                 type="button"
-                onClick={() => setConcept(preset.concept)}
-                className="px-3 py-1.5 rounded-xl bg-stone-50 hover:bg-[#FBEFC5]/50 border border-stone-200 hover:border-[#F71C25]/40 text-xs font-bold text-stone-700 hover:text-stone-950 transition-colors cursor-pointer active:scale-[0.98]"
+                onClick={() => handleApplyPreset(preset)}
+                className="px-2.5 py-1 rounded-lg bg-[#171C28] hover:bg-amber-500/15 border border-slate-700/80 hover:border-amber-500/40 text-[11px] font-semibold text-slate-200 hover:text-amber-300 transition-all cursor-pointer"
               >
-                {preset.label}
+                {preset.badge}
               </button>
             ))}
           </div>
         </div>
-      </div>
 
-      {/* Main Form Box */}
-      <div className="bg-white rounded-3xl p-6 sm:p-8 border border-stone-200/90 shadow-sm space-y-6">
-        {/* Concept / Script Textarea */}
-        <div className="space-y-2">
-          <label className="text-xs font-bold text-stone-900 flex items-center justify-between">
-            <span>บรีฟเรื่องราว หรือ วางสคริปต์ฉาก:</span>
-            <span className="text-[11px] font-mono text-stone-400">รองรับภาษาไทย และอังกฤษ</span>
-          </label>
+        {/* Script / Brief Textarea */}
+        <div className="space-y-1.5">
+          <div className="flex items-center justify-between">
+            <label className="text-xs font-bold text-slate-200">
+              {inputMode === 'script'
+                ? 'วางบทสคริปต์หลายฉาก (Scene 1..N หรือ 1..N)'
+                : 'รายละเอียดบรีฟ / พล็อตเรื่องที่ต้องการ'}
+            </label>
+            {storyConcept && (
+              <button
+                type="button"
+                onClick={() => setStoryConcept('')}
+                className="text-[11px] text-slate-500 hover:text-rose-400 cursor-pointer"
+              >
+                ล้างข้อความ
+              </button>
+            )}
+          </div>
           <textarea
-            rows={7}
-            value={concept}
-            onChange={(e) => setConcept(e.target.value)}
-            placeholder="พิมพ์เรื่องราว เช่น 'บรรยากาศส่งมอบ Mazda CX-6e เซลล์อธิบายฟังก์ชั่นและส่งมอบกุญแจ...' หรือวางสคริปต์ Scene 1: ... Scene 2: ..."
-            className="w-full px-4 py-3 rounded-2xl border border-stone-200 focus:border-[#F71C25] text-xs sm:text-sm text-stone-900 placeholder:text-stone-400 focus:outline-none resize-none leading-relaxed font-sans shadow-2xs"
+            value={storyConcept}
+            onChange={(e) => setStoryConcept(e.target.value)}
+            rows={8}
+            placeholder={
+              inputMode === 'script'
+                ? 'วางสคริปต์ที่มี Scene 1: ... Prompt: ... ระบบจะแยกทุกฉากตามต้นฉบับ 100%'
+                : 'พิมพ์ไอเดีย เช่น ส่งมอบรถใหม่ในโชว์รูม, รีวิวสินค้า, หรือเขียนเป็นข้อๆ 1, 2, 3...'
+            }
+            className="w-full p-3.5 rounded-xl bg-[#0B0D11] border border-slate-800 focus:border-amber-500/70 focus:outline-none text-xs text-slate-100 placeholder:text-slate-600 leading-relaxed resize-y font-sans"
           />
         </div>
 
-        {/* Options Grid: Aspect Ratio, Style, Shot Count, Duration */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 pt-2">
-          {/* Aspect Ratio */}
-          <div className="space-y-1.5">
-            <label className="text-xs font-bold text-stone-800 flex items-center gap-1.5">
-              <Ratio className="w-3.5 h-3.5 text-[#F71C25]" />
-              <span>สัดส่วนภาพ:</span>
-            </label>
-            <div className="grid grid-cols-2 gap-1.5 p-1 bg-stone-100 rounded-xl">
-              <button
-                type="button"
-                onClick={() => setAspectRatio('16:9')}
-                className={`py-1.5 rounded-lg text-xs font-bold cursor-pointer transition-all ${
-                  aspectRatio === '16:9' ? 'bg-white text-stone-950 shadow-xs' : 'text-stone-600 hover:text-stone-900'
-                }`}
-              >
-                16:9 แนวนอน
-              </button>
-              <button
-                type="button"
-                onClick={() => setAspectRatio('9:16')}
-                className={`py-1.5 rounded-lg text-xs font-bold cursor-pointer transition-all ${
-                  aspectRatio === '9:16' ? 'bg-white text-stone-950 shadow-xs' : 'text-stone-600 hover:text-stone-900'
-                }`}
-              >
-                9:16 มือถือ
-              </button>
-            </div>
-          </div>
-
-          {/* Visual Style */}
-          <div className="space-y-1.5">
-            <label className="text-xs font-bold text-stone-800 flex items-center gap-1.5">
-              <Film className="w-3.5 h-3.5 text-[#F71C25]" />
-              <span>สไตล์ภาพ:</span>
+        {/* Visual Style & Aspect Ratio */}
+        <div className="grid grid-cols-1 gap-3">
+          <div>
+            <label className="text-[11px] font-bold text-slate-300 flex items-center gap-1.5 mb-1.5">
+              <Film className="w-3.5 h-3.5 text-amber-400" />
+              <span>สไตล์ภาพและแสง (Visual Style)</span>
             </label>
             <select
               value={visualStyle}
               onChange={(e) => setVisualStyle(e.target.value)}
-              className="w-full px-3 py-2 rounded-xl border border-stone-200 text-xs font-bold text-stone-800 bg-white focus:outline-none focus:border-[#F71C25] cursor-pointer"
+              className="w-full px-3 py-2 rounded-xl bg-[#0B0D11] border border-slate-800 text-xs text-slate-100 focus:outline-none focus:border-amber-500 cursor-pointer"
             >
-              {STYLES.map((st) => (
-                <option key={st.id} value={st.id}>
+              {VISUAL_STYLES.map((st) => (
+                <option key={st.id} value={st.id} className="bg-[#10131B] text-slate-100">
                   {st.label}
                 </option>
               ))}
             </select>
           </div>
 
-          {/* Shot Count */}
-          <div className="space-y-1.5">
-            <label className="text-xs font-bold text-stone-800 flex items-center justify-between">
-              <span className="flex items-center gap-1.5">
-                <Layers className="w-3.5 h-3.5 text-[#F71C25]" />
-                <span>จำนวนช็อต:</span>
-              </span>
-              <span className="font-mono text-[#F71C25]">{shotCount} ช็อต</span>
-            </label>
-            <input
-              type="range"
-              min={3}
-              max={24}
-              step={1}
-              value={shotCount}
-              onChange={(e) => setShotCount(parseInt(e.target.value, 10))}
-              className="w-full accent-[#F71C25] cursor-pointer"
-            />
-            <div className="flex justify-between text-[10px] font-mono text-stone-400">
-              <span>3 ช็อต</span>
-              <span>12</span>
-              <span>24 ช็อต</span>
-            </div>
-          </div>
-
-          {/* Duration */}
-          <div className="space-y-1.5">
-            <label className="text-xs font-bold text-stone-800 flex items-center justify-between">
-              <span className="flex items-center gap-1.5">
-                <Clock className="w-3.5 h-3.5 text-[#F71C25]" />
-                <span>ความยาวคลิป:</span>
-              </span>
-              <span className="font-mono text-[#F71C25]">{duration} วิ</span>
-            </label>
-            <div className="grid grid-cols-3 gap-1 p-1 bg-stone-100 rounded-xl">
-              {[15, 30, 60].map((sec) => (
+          <div className="grid grid-cols-2 gap-2.5">
+            {/* Aspect Ratio */}
+            <div>
+              <label className="text-[11px] font-bold text-slate-300 flex items-center gap-1 mb-1.5">
+                <Ratio className="w-3.5 h-3.5 text-amber-400" />
+                <span>สัดส่วนภาพ</span>
+              </label>
+              <div className="grid grid-cols-2 gap-1 p-1 bg-[#0B0D11] rounded-xl border border-slate-800">
                 <button
-                  key={sec}
                   type="button"
-                  onClick={() => setDuration(sec)}
-                  className={`py-1.5 rounded-lg text-xs font-bold cursor-pointer transition-all ${
-                    duration === sec ? 'bg-white text-stone-950 shadow-xs' : 'text-stone-600 hover:text-stone-900'
+                  onClick={() => setAspectRatio('16:9')}
+                  className={`py-1.5 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${
+                    aspectRatio === '16:9'
+                      ? 'bg-amber-500 text-slate-950'
+                      : 'text-slate-400 hover:text-white'
                   }`}
                 >
-                  {sec}s
+                  16:9 แนวนอน
                 </button>
-              ))}
+                <button
+                  type="button"
+                  onClick={() => setAspectRatio('9:16')}
+                  className={`py-1.5 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${
+                    aspectRatio === '9:16'
+                      ? 'bg-amber-500 text-slate-950'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  9:16 แนวตั้ง
+                </button>
+              </div>
+            </div>
+
+            {/* Number of Shots */}
+            <div>
+              <label className="text-[11px] font-bold text-slate-300 flex items-center gap-1 mb-1.5">
+                <Layers className="w-3.5 h-3.5 text-amber-400" />
+                <span>จำนวนช็อต</span>
+              </label>
+              {detectedScenesCount >= 2 ? (
+                <div className="px-3 py-2 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-[11px] font-bold text-emerald-300 text-center">
+                  ตามบท ({detectedScenesCount} ช็อต)
+                </div>
+              ) : (
+                <div className="grid grid-cols-4 gap-1 p-1 bg-[#0B0D11] rounded-xl border border-slate-800">
+                  {[4, 6, 8, 12].map((n) => (
+                    <button
+                      key={n}
+                      type="button"
+                      onClick={() => setNumShots(n)}
+                      className={`py-1.5 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${
+                        numShots === n
+                          ? 'bg-amber-500 text-slate-950'
+                          : 'text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      {n}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         </div>
 
-        {/* Status Msg */}
-        {statusMsg && (
-          <div className="p-3 rounded-2xl bg-[#FDF8EE] border border-[#EADBBD] text-xs font-mono font-bold text-[#F71C25] flex items-center gap-2 animate-pulse">
-            <Sparkles className="w-4 h-4" />
-            <span>{statusMsg}</span>
+        {errorMsg && (
+          <div className="p-3 rounded-xl bg-rose-500/15 border border-rose-500/30 text-xs text-rose-300 flex items-center gap-2">
+            <AlertCircle className="w-4 h-4 shrink-0" />
+            <span>{errorMsg}</span>
           </div>
         )}
 
-        {/* Submit Button */}
-        <div className="pt-2 flex flex-col sm:flex-row items-center justify-between gap-4 border-t border-stone-100">
-          <p className="text-xs text-stone-500">
-            ระบบจะสร้างโครงสร้างสตอรี่บอร์ด รายการช็อต มุมกล้อง และ prompt ให้ครบทุกฉาก
-          </p>
+        {/* Dual Action Buttons */}
+        <div className="pt-2 space-y-2.5">
+          {/* Primary: Create + Auto-Render AI Images */}
           <button
             type="button"
-            disabled={isGenerating || !concept.trim()}
-            onClick={handleGenerate}
-            className="w-full sm:w-auto px-6 py-3 rounded-2xl bg-gradient-to-r from-[#F71C25] to-[#FF4438] hover:from-[#E0141D] hover:to-[#E02D24] disabled:opacity-50 text-white font-bold text-xs sm:text-sm flex items-center justify-center gap-2 shadow-md shadow-red-500/25 active:scale-[0.98] transition-all cursor-pointer"
+            disabled={isPlanning}
+            onClick={() => handleSubmit(false)}
+            className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 disabled:opacity-50 text-slate-950 font-extrabold text-xs shadow-lg shadow-amber-500/20 flex items-center justify-center gap-2 transition-all cursor-pointer"
           >
-            {isGenerating ? (
+            {isPlanning ? (
               <>
-                <Loader2 className="w-4 h-4 animate-spin" />
-                <span>กำลังวางสตอรี่บอร์ด AI...</span>
+                <RefreshCw className="w-4 h-4 animate-spin" />
+                <span>กำลังแตกช็อตและเตรียมวาดภาพ AI...</span>
               </>
             ) : (
               <>
-                <span>🎬 วางโครงสร้างสตอรี่บอร์ด AI</span>
-                <ArrowRight className="w-4 h-4" />
+                <Sparkles className="w-4 h-4 stroke-[2.5]" />
+                <span>
+                  สร้างสตอรี่บอร์ด + วาดภาพ AI ทันที ({detectedScenesCount >= 2 ? detectedScenesCount : numShots} ช็อต)
+                </span>
               </>
             )}
           </button>
+
+          {/* Secondary: Break into shots & review/edit prompts BEFORE rendering */}
+          <button
+            type="button"
+            disabled={isPlanning}
+            onClick={() => handleSubmit(true)}
+            className="w-full py-2.5 px-4 rounded-xl bg-[#171C28] hover:bg-[#1F2637] border border-slate-700 hover:border-amber-500/50 text-slate-200 hover:text-amber-300 font-bold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer"
+          >
+            <Edit3 className="w-3.5 h-3.5 text-amber-400" />
+            <span>แตกช็อตเพื่อตรวจ / แก้ไข Prompt ทั้งหมดก่อนวาดภาพ</span>
+          </button>
         </div>
       </div>
-    </div>
+    </aside>
   );
 }

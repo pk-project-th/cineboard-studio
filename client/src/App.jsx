@@ -1,393 +1,563 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import TopNav from './components/TopNav';
-import BoardHeader from './components/BoardHeader';
+import BriefView from './components/BriefView';
 import BoardView from './components/BoardView';
 import ShotListView from './components/ShotListView';
-import BriefView from './components/BriefView';
-import DetailInspector from './components/DetailInspector';
 import SettingsModal from './components/SettingsModal';
-import ImageViewerModal from './components/ImageViewerModal';
-import EditShotModal from './components/EditShotModal';
-import DeleteConfirmModal from './components/DeleteConfirmModal';
 import { RefreshCw } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
 export default function App() {
-  // Step Navigation: 'brief' (Step 1) | 'shotlist' (Step 2) | 'board' (Step 3)
-  const [activeStep, setActiveStep] = useState('board');
-  const [zoomLevel, setZoomLevel] = useState(2); // 1, 2, 3
-  const [selectedItem, setSelectedItem] = useState(null);
-
-  // Modals
+  // Views: 'board' | 'bulk_editor' | 'shotlist'
+  const [activeView, setActiveView] = useState('board');
+  const [sidebarOpen, setSidebarOpen] = useState(true);
   const [settingsModalOpen, setSettingsModalOpen] = useState(false);
-  const [imageViewerOpen, setImageViewerOpen] = useState(false);
-  const [editShotModalOpen, setEditShotModalOpen] = useState(false);
-  const [deleteModalConfig, setDeleteModalConfig] = useState(null);
 
-  // Data
-  const [prompts, setPrompts] = useState([]);
+  // Data States
   const [seriesList, setSeriesList] = useState([]);
   const [selectedSeriesId, setSelectedSeriesId] = useState('all');
+  const [prompts, setPrompts] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // Fetch Series
+  // AI Planning & Rendering States
+  const [isPlanning, setIsPlanning] = useState(false);
+  const [preCommitDraft, setPreCommitDraft] = useState(null);
+  const [renderingIds, setRenderingIds] = useState({});
+  const [batchRenderProgress, setBatchRenderProgress] = useState({
+    active: false,
+    current: 0,
+    total: 0
+  });
+  const [copiedAll, setCopiedAll] = useState(false);
+  const abortBatchRef = useRef(false);
+
+  // Fetch Series List
   const fetchSeries = async () => {
     try {
       const res = await fetch('/api/series');
       const data = await res.json();
-      if (data.success && data.data) {
+      if (data.success && Array.isArray(data.data)) {
         setSeriesList(data.data);
         return data.data;
       }
     } catch (err) {
-      console.error('Failed to fetch series', err);
+      console.error('Failed to fetch series:', err);
     }
     return [];
   };
 
-  // Fetch Prompts
+  // Fetch Shots for Series
   const fetchPrompts = async (seriesId = selectedSeriesId) => {
     setLoading(true);
     try {
-      const url = seriesId && seriesId !== 'all' ? `/api/prompts?series_id=${seriesId}` : '/api/prompts';
+      const url =
+        seriesId && seriesId !== 'all'
+          ? `/api/prompts?series_id=${seriesId}`
+          : '/api/prompts';
       const res = await fetch(url);
       const data = await res.json();
-      if (data.success) {
+      if (data.success && Array.isArray(data.data)) {
         setPrompts(data.data);
-        if (data.data.length > 0) {
-          setSelectedItem(data.data[0]);
-        } else {
-          setSelectedItem(null);
-        }
+        return data.data;
       }
     } catch (err) {
-      console.error('Failed to fetch prompts', err);
+      console.error('Failed to fetch prompts:', err);
     } finally {
       setLoading(false);
     }
+    return [];
   };
 
-  // Initial Load: Restore last active project or latest
+  // Initial Load
   useEffect(() => {
     const init = async () => {
       const series = await fetchSeries();
-      const lastActiveId = localStorage.getItem('cineprompt_last_active_series');
+      const savedSeriesId = localStorage.getItem('cineboard_active_series');
       let targetId = 'all';
 
-      if (series && series.length > 0) {
-        if (lastActiveId && series.some((s) => s.id === lastActiveId)) {
-          targetId = lastActiveId;
+      if (series.length > 0) {
+        if (savedSeriesId && series.some((s) => s.id === savedSeriesId)) {
+          targetId = savedSeriesId;
         } else {
           targetId = series[0].id;
         }
         setSelectedSeriesId(targetId);
         await fetchPrompts(targetId);
-        setActiveStep('board');
       } else {
-        targetId = 'all';
         setSelectedSeriesId('all');
         await fetchPrompts('all');
-        setActiveStep('brief');
       }
     };
     init();
   }, []);
 
-  // Handle Project Selection
-  const handleSelectSeries = (id) => {
+  // Select Project
+  const handleSelectSeries = async (id) => {
+    setPreCommitDraft(null);
     setSelectedSeriesId(id);
     try {
-      if (id && id !== 'all') {
-        localStorage.setItem('cineprompt_last_active_series', id);
-      } else {
-        localStorage.removeItem('cineprompt_last_active_series');
-      }
+      localStorage.setItem('cineboard_active_series', id);
     } catch (_) {}
-    fetchPrompts(id);
-    setActiveStep('board');
+    await fetchPrompts(id);
+    setActiveView('board');
   };
 
-  // Start New Project
-  const handleStartNewProject = () => {
-    setActiveStep('brief');
-  };
+  // Render a single shot's AI image via FLUX.1
+  const handleRenderShotImage = async (shotId, customPrompt) => {
+    if (!shotId) return null;
+    setRenderingIds((prev) => ({ ...prev, [shotId]: true }));
 
-  // When a new storyboard is created from Step 1
-  const handleStoryboardCreated = async (payload) => {
-    const seriesId = payload?.series_id;
-    await fetchSeries();
-    if (seriesId) {
-      setSelectedSeriesId(seriesId);
-      try {
-        localStorage.setItem('cineprompt_last_active_series', seriesId);
-      } catch (_) {}
-      await fetchPrompts(seriesId);
-    }
-    // Switch to Step 2: Shot List Breakdown
-    setActiveStep('shotlist');
-  };
-
-  // Generate real AI image for a specific shot
-  const handleGenerateImageForShot = async (shot) => {
-    if (!shot || !shot.id) return;
-    const promptText = shot.content || shot.prompt || shot.title;
-    const res = await fetch(`/api/prompts/${shot.id}/generate-image`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        prompt: promptText,
-        aspect_ratio: shot.aspect_ratio || '16:9'
-      })
-    });
-
-    const data = await res.json();
-    if (!data.success) {
-      throw new Error(data.error || 'สร้างภาพไม่สำเร็จ');
-    }
-
-    // Update local state immediately
-    const updated = data.data;
-    setPrompts((prev) => prev.map((p) => (p.id === shot.id ? updated : p)));
-    if (selectedItem?.id === shot.id) {
-      setSelectedItem(updated);
-    }
-    return updated;
-  };
-
-  // Handle Shot Updated from modal or inline editor
-  const handleShotUpdated = (updatedShot) => {
-    if (!updatedShot) return;
-    setPrompts((prev) => prev.map((p) => (p.id === updatedShot.id ? updatedShot : p)));
-    if (selectedItem?.id === updatedShot.id) {
-      setSelectedItem(updatedShot);
-    }
-  };
-
-  // Delete an individual shot
-  const handleDeletePrompt = (id) => {
-    setDeleteModalConfig({
-      title: 'ยืนยันการลบช็อต',
-      message: 'คุณแน่ใจหรือไม่ว่าต้องการลบช็อตนี้ออกจากสตอรี่บอร์ด?',
-      onConfirm: async () => {
-        try {
-          const res = await fetch(`/api/prompts/${id}`, { method: 'DELETE' });
-          const data = await res.json();
-          if (data.success) {
-            setPrompts((prev) => prev.filter((p) => p.id !== id));
-            if (selectedItem?.id === id) {
-              setSelectedItem(null);
-            }
-          } else {
-            alert(data.error || 'ลบไม่สำเร็จ');
-          }
-        } catch (err) {
-          console.error(err);
-          alert('เกิดข้อผิดพลาดในการลบช็อต');
-        } finally {
-          setDeleteModalConfig(null);
-        }
-      }
-    });
-  };
-
-  // Delete an entire project
-  const handleDeleteSeries = (seriesId) => {
-    const s = seriesList.find((item) => item.id === seriesId) || { id: seriesId, title: 'โปรเจกต์นี้' };
-    setDeleteModalConfig({
-      title: 'ยืนยันการลบโปรเจกต์สตอรี่บอร์ด',
-      message: `คุณแน่ใจหรือไม่ว่าต้องการลบโปรเจกต์ "${s.title}" และช็อตทั้งหมดในโปรเจกต์นี้?`,
-      onConfirm: async () => {
-        try {
-          await fetch(`/api/series/${encodeURIComponent(s.id)}`, { method: 'DELETE' });
-          await fetchSeries();
-          if (selectedSeriesId === s.id) {
-            try {
-              localStorage.removeItem('cineprompt_last_active_series');
-            } catch (_) {}
-            setSelectedSeriesId('all');
-            await fetchPrompts('all');
-          }
-        } catch (err) {
-          console.error(err);
-        } finally {
-          setDeleteModalConfig(null);
-        }
-      }
-    });
-  };
-
-  // Clear all board data
-  const handleClearAllBoard = async () => {
-    if (!window.confirm('คุณต้องการล้างการ์ดบนบอร์ดทั้งหมดเพื่อเริ่มสร้างสตอรี่บอร์ดใหม่ใช่หรือไม่?')) return;
     try {
-      const res = await fetch('/api/admin/clear', { method: 'POST' });
+      const targetShot = prompts.find((p) => p.id === shotId);
+      const promptToUse = customPrompt || targetShot?.content || targetShot?.title || '';
+
+      // Also persist the updated prompt if the user edited it
+      if (customPrompt && targetShot && customPrompt !== targetShot.content) {
+        await fetch(`/api/prompts/${shotId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ content: customPrompt })
+        });
+      }
+
+      const res = await fetch(`/api/prompts/${shotId}/generate-image`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          prompt: promptToUse,
+          aspect_ratio: targetShot?.aspect_ratio || '16:9'
+        })
+      });
+      const data = await res.json();
+      if (data.success && data.data) {
+        setPrompts((prev) =>
+          prev.map((item) => (item.id === shotId ? data.data : item))
+        );
+        return data.data;
+      }
+    } catch (err) {
+      console.error('Failed to render shot image:', err);
+    } finally {
+      setRenderingIds((prev) => {
+        const next = { ...prev };
+        delete next[shotId];
+        return next;
+      });
+    }
+    return null;
+  };
+
+  // Sequentially render FLUX.1 AI images for a list of shots
+  const runBatchImageRender = async (shotsList, onlyMissing = false) => {
+    const targets = onlyMissing
+      ? shotsList.filter(
+          (s) => !s.image_url || s.image_url.startsWith('data:image/svg+xml')
+        )
+      : shotsList;
+
+    if (targets.length === 0) return;
+
+    abortBatchRef.current = false;
+    setBatchRenderProgress({ active: true, current: 0, total: targets.length });
+
+    for (let i = 0; i < targets.length; i++) {
+      if (abortBatchRef.current) break;
+      const shot = targets[i];
+      setBatchRenderProgress({
+        active: true,
+        current: i + 1,
+        total: targets.length
+      });
+      await handleRenderShotImage(shot.id, shot.content);
+    }
+
+    setBatchRenderProgress({ active: false, current: 0, total: 0 });
+    await fetchSeries();
+  };
+
+  // Option 1: Plan Storyboard -> Commit to Board -> Auto-Render Real FLUX.1 Images Immediately
+  const handlePlanAndAutoRender = async (payload) => {
+    setIsPlanning(true);
+    setPreCommitDraft(null);
+    try {
+      const planRes = await fetch('/api/storyboard/ai-plan', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const planJson = await planRes.json();
+      if (!planJson.success || !planJson.data?.shots) {
+        alert(planJson.error || 'ไม่สามารถแตกช็อตได้ กรุณาลองใหม่อีกครั้งครับ');
+        return;
+      }
+
+      const planData = planJson.data;
+      const commitRes = await fetch('/api/storyboard/commit-shots', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          project_title: planData.project_title,
+          visual_style: payload.visual_style,
+          target_duration: planData.target_duration || payload.target_duration,
+          pacing: payload.pacing || 'normal',
+          aspect_ratio: payload.aspect_ratio || '16:9',
+          shots: planData.shots
+        })
+      });
+      const commitJson = await commitRes.json();
+      if (commitJson.success && commitJson.data) {
+        const newSeriesId = commitJson.series_id;
+        await fetchSeries();
+        setSelectedSeriesId(newSeriesId);
+        localStorage.setItem('cineboard_active_series', newSeriesId);
+        setPrompts(commitJson.data);
+        setActiveView('board');
+
+        try {
+          confetti({ particleCount: 45, spread: 60, origin: { y: 0.6 } });
+        } catch (_) {}
+
+        // Immediately start rendering real FLUX.1 AI images for all created shots!
+        runBatchImageRender(commitJson.data, false);
+      }
+    } catch (err) {
+      console.error('Plan and auto render error:', err);
+    } finally {
+      setIsPlanning(false);
+    }
+  };
+
+  // Option 2: Plan Storyboard -> Open in Bulk Prompt Editor BEFORE Committing/Rendering
+  const handlePlanForReview = async (payload) => {
+    setIsPlanning(true);
+    try {
+      const planRes = await fetch('/api/storyboard/ai-plan', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const planJson = await planRes.json();
+      if (!planJson.success || !planJson.data?.shots) {
+        alert(planJson.error || 'ไม่สามารถแตกช็อตได้ กรุณาลองใหม่อีกครั้งครับ');
+        return;
+      }
+
+      setPreCommitDraft({
+        project_title: planJson.data.project_title,
+        visual_style: payload.visual_style,
+        target_duration: planJson.data.target_duration || payload.target_duration,
+        aspect_ratio: payload.aspect_ratio || '16:9',
+        shots: planJson.data.shots
+      });
+      setActiveView('bulk_editor');
+    } catch (err) {
+      console.error('Plan for review error:', err);
+    } finally {
+      setIsPlanning(false);
+    }
+  };
+
+  // Commit reviewed draft from Bulk Editor (and optionally auto-render all images)
+  const handleCommitDraftAndRender = async (draftPayload, shouldRenderAll = true) => {
+    try {
+      const commitRes = await fetch('/api/storyboard/commit-shots', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          project_title: draftPayload.project_title,
+          visual_style: draftPayload.visual_style || 'Commercial Luxury',
+          target_duration: draftPayload.target_duration || 30,
+          aspect_ratio: draftPayload.aspect_ratio || '16:9',
+          shots: draftPayload.shots
+        })
+      });
+      const commitJson = await commitRes.json();
+      if (commitJson.success && commitJson.data) {
+        setPreCommitDraft(null);
+        const newSeriesId = commitJson.series_id;
+        await fetchSeries();
+        setSelectedSeriesId(newSeriesId);
+        localStorage.setItem('cineboard_active_series', newSeriesId);
+        setPrompts(commitJson.data);
+        setActiveView('board');
+
+        if (shouldRenderAll) {
+          runBatchImageRender(commitJson.data, false);
+        }
+      }
+    } catch (err) {
+      console.error('Commit draft error:', err);
+    }
+  };
+
+  // Update a single shot inline
+  const handleUpdateShot = async (id, updatedFields) => {
+    setPrompts((prev) =>
+      prev.map((item) => (item.id === id ? { ...item, ...updatedFields } : item))
+    );
+    try {
+      await fetch(`/api/prompts/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updatedFields)
+      });
+    } catch (err) {
+      console.error('Update shot failed:', err);
+    }
+  };
+
+  // Save Bulk Edits for an existing board
+  const handleSaveBulkEdits = async (editedShots) => {
+    // Handle any newly added rows vs existing rows
+    const existingUpdates = [];
+    for (const s of editedShots) {
+      if (s.isNew) {
+        await fetch('/api/storyboard/append-shot', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            series_id: selectedSeriesId,
+            shot: {
+              title: s.title,
+              camera_angle: s.camera_angle,
+              duration_seconds: s.duration_seconds,
+              action_description: s.action_description,
+              dialogue: s.dialogue_script,
+              prompt: s.content,
+              aspect_ratio: s.aspect_ratio || '16:9'
+            }
+          })
+        });
+      } else {
+        existingUpdates.push(s);
+      }
+    }
+
+    if (existingUpdates.length > 0) {
+      await fetch('/api/prompts-batch', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ updates: existingUpdates })
+      });
+    }
+
+    // Delete any shots that were removed in bulk editor
+    const keptIds = new Set(existingUpdates.map((u) => u.id));
+    for (const oldShot of prompts) {
+      if (!keptIds.has(oldShot.id)) {
+        await fetch(`/api/prompts/${oldShot.id}`, { method: 'DELETE' });
+      }
+    }
+
+    const refreshed = await fetchPrompts(selectedSeriesId);
+    await fetchSeries();
+    return refreshed;
+  };
+
+  const handleSaveBulkAndRenderAll = async (editedShots) => {
+    const refreshed = await handleSaveBulkEdits(editedShots);
+    setActiveView('board');
+    if (refreshed && refreshed.length > 0) {
+      runBatchImageRender(refreshed, false);
+    }
+  };
+
+  // Add a single shot to current board
+  const handleAddShot = async () => {
+    let targetSeries = selectedSeriesId;
+    if (!targetSeries || targetSeries === 'all') {
+      if (seriesList.length > 0) {
+        targetSeries = seriesList[0].id;
+      } else {
+        return;
+      }
+    }
+
+    try {
+      const res = await fetch('/api/storyboard/append-shot', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          series_id: targetSeries,
+          shot: {
+            title: `ฉากเพิ่มเติมที่ ${prompts.length + 1}`,
+            camera_angle: 'Medium Shot',
+            action_description: 'ระบุแอคชั่นในฉากนี้...',
+            prompt: 'Medium shot, cinematic lighting, photorealistic commercial photography, 8k',
+            aspect_ratio: prompts[0]?.aspect_ratio || '16:9'
+          }
+        })
+      });
+      const data = await res.json();
+      if (data.success && data.data) {
+        setPrompts((prev) => [...prev, data.data]);
+        fetchSeries();
+      }
+    } catch (err) {
+      console.error('Add shot failed:', err);
+    }
+  };
+
+  // Delete a single shot
+  const handleDeleteShot = async (id) => {
+    setPrompts((prev) => prev.filter((p) => p.id !== id));
+    try {
+      await fetch(`/api/prompts/${id}`, { method: 'DELETE' });
+      fetchSeries();
+    } catch (err) {
+      console.error('Delete shot failed:', err);
+    }
+  };
+
+  // Upload custom image for a shot
+  const handleUploadShotImage = async (shotId, base64Data, filename) => {
+    try {
+      const res = await fetch('/api/upload', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ image: base64Data, filename })
+      });
+      const data = await res.json();
+      if (data.success && data.data?.url) {
+        await handleUpdateShot(shotId, { image_url: data.data.url });
+      }
+    } catch (err) {
+      console.error('Upload image failed:', err);
+    }
+  };
+
+  // Delete a project series
+  const handleDeleteSeries = async (id, title) => {
+    if (!window.confirm(`ต้องการลบโปรเจกต์ "${title}" หรือไม่ครับ?`)) return;
+    try {
+      const res = await fetch(`/api/series/${id}`, { method: 'DELETE' });
       const data = await res.json();
       if (data.success) {
-        try {
-          localStorage.removeItem('cineprompt_last_active_series');
-          localStorage.removeItem('cineprompt_draft_text');
-        } catch (_) {}
-        setPrompts([]);
-        setSeriesList([]);
-        setSelectedSeriesId('all');
-        setSelectedItem(null);
-        setActiveStep('brief');
-        confetti({ particleCount: 30, spread: 60, colors: ['#F71C25', '#FF4D4D', '#ffffff'] });
-      } else {
-        alert(data.error || 'ล้างข้อมูลไม่สำเร็จ');
+        const remaining = await fetchSeries();
+        if (remaining.length > 0) {
+          handleSelectSeries(remaining[0].id);
+        } else {
+          setSelectedSeriesId('all');
+          setPrompts([]);
+        }
       }
-    } catch (e) {
-      console.error(e);
-      alert('เกิดข้อผิดพลาดในการล้างข้อมูล');
+    } catch (err) {
+      console.error('Delete series failed:', err);
     }
   };
 
-  // Current active series object
-  const activeSeries = seriesList.find((s) => s.id === selectedSeriesId);
+  // Clear all projects
+  const handleClearAllData = async () => {
+    if (!window.confirm('ต้องการล้างประวัติโปรเจกต์ทั้งหมดบนกระดานใช่หรือไม่ครับ?')) return;
+    try {
+      await fetch('/api/admin/clear', { method: 'POST' });
+      localStorage.removeItem('cineboard_active_series');
+      setSeriesList([]);
+      setPrompts([]);
+      setSelectedSeriesId('all');
+    } catch (err) {
+      console.error('Clear all failed:', err);
+    }
+  };
+
+  // Copy All Prompts
+  const handleCopyAllPrompts = () => {
+    if (prompts.length === 0) return;
+    const text = prompts
+      .map(
+        (p, idx) =>
+          `=== SHOT ${idx + 1}: ${p.title} (${p.camera_angle || 'Medium Shot'}) ===\nAction (TH): ${
+            p.action_description || '-'
+          }\nImage Prompt (EN): ${p.content || '-'}\nVideo Prompt: ${p.video_prompt || '-'}`
+      )
+      .join('\n\n');
+
+    navigator.clipboard.writeText(text);
+    setCopiedAll(true);
+    setTimeout(() => setCopiedAll(false), 2000);
+  };
+
+  const currentSeries = seriesList.find((s) => s.id === selectedSeriesId);
 
   return (
-    <div className="h-screen w-screen bg-[#FAF9F5] text-stone-900 flex flex-col overflow-hidden font-sans select-none selection:bg-[#F71C25]/20 selection:text-[#F71C25]">
-      {/* 1. Global Studio Navigation Bar */}
+    <div className="min-h-screen bg-[#0B0D11] text-[#F1F5F9] flex flex-col">
+      {/* Top Studio Bar */}
       <TopNav
-        activeStep={activeStep}
-        setActiveStep={setActiveStep}
-        onStartNewProject={handleStartNewProject}
+        activeView={activeView}
+        onChangeView={(v) => {
+          if (v !== 'bulk_editor') setPreCommitDraft(null);
+          setActiveView(v);
+        }}
+        sidebarOpen={sidebarOpen}
+        onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
+        seriesList={seriesList}
+        selectedSeriesId={selectedSeriesId}
+        onSelectSeries={handleSelectSeries}
+        onNewProject={() => setSidebarOpen(true)}
+        onDeleteSeries={handleDeleteSeries}
+        onClearAllData={handleClearAllData}
+        onBatchRenderAll={(onlyMissing) => runBatchImageRender(prompts, onlyMissing)}
+        batchRenderProgress={batchRenderProgress}
+        onCopyAllPrompts={handleCopyAllPrompts}
+        copiedAll={copiedAll}
         onOpenSettings={() => setSettingsModalOpen(true)}
-        onPrintStoryboard={() => window.print()}
         totalShots={prompts.length}
       />
 
-      {/* 2. Sub-Header Toolbar (Shown on Step 2 & 3) */}
-      {activeStep !== 'brief' && (
-        <BoardHeader
-          zoomLevel={zoomLevel}
-          setZoomLevel={setZoomLevel}
-          onClearBoard={handleClearAllBoard}
-          seriesList={seriesList}
-          selectedSeriesId={selectedSeriesId}
-          onSelectSeries={handleSelectSeries}
-          onDeleteSeries={handleDeleteSeries}
-          onStartNewProject={handleStartNewProject}
-          promptsCount={prompts.length}
-          prompts={prompts}
-          onBatchUpdated={() => fetchPrompts(selectedSeriesId)}
-        />
-      )}
+      {/* Main Studio Workspace: Left Collapsible Director Dock + Right Canvas */}
+      <div className="flex-1 flex flex-col lg:flex-row min-h-[calc(100vh-3.5rem)]">
+        {sidebarOpen && (
+          <BriefView
+            onPlanAndAutoRender={handlePlanAndAutoRender}
+            onPlanForReview={handlePlanForReview}
+            isPlanning={isPlanning}
+          />
+        )}
 
-      {/* 3. Main Workspace Area */}
-      <div className="flex-1 flex min-h-0 relative overflow-hidden">
-        {/* Center Content View */}
-        <div className="flex-1 flex flex-col relative min-w-0 overflow-y-auto">
-          {loading && activeStep !== 'brief' ? (
-            <div className="h-full flex flex-col items-center justify-center gap-3 text-stone-500 py-32 font-mono text-xs">
-              <RefreshCw className="w-6 h-6 animate-spin text-[#F71C25]" />
-              <span>กำลังโหลด CineBoard Studio...</span>
+        <main className="flex-1 min-w-0 overflow-y-auto">
+          {loading ? (
+            <div className="py-28 flex flex-col items-center justify-center gap-3 text-slate-400">
+              <RefreshCw className="w-6 h-6 animate-spin text-amber-400" />
+              <span className="text-xs font-mono">กำลังโหลดกระดานสตอรี่บอร์ด...</span>
             </div>
-          ) : activeStep === 'brief' ? (
-            /* STEP 1: BRIEF & SCRIPT CREATOR */
-            <BriefView
-              onStoryboardCreated={handleStoryboardCreated}
-              onGoToBoard={() => setActiveStep('board')}
-            />
-          ) : activeStep === 'shotlist' ? (
-            /* STEP 2: SHOT LIST & BREAKDOWN EDITOR */
-            <ShotListView
-              prompts={prompts}
-              seriesTitle={activeSeries?.title || 'รวมทุกโปรเจกต์สตอรี่บอร์ด'}
-              onEditPrompt={(p) => {
-                setSelectedItem(p);
-                setEditShotModalOpen(true);
-              }}
-              onDeletePrompt={handleDeletePrompt}
-              onAppendShot={() => setActiveStep('brief')}
-              onGoToBoard={() => setActiveStep('board')}
-              onGenerateImageForShot={handleGenerateImageForShot}
-            />
-          ) : (
-            /* STEP 3: STORYBOARD CANVAS BOARD */
+          ) : activeView === 'board' && !preCommitDraft ? (
             <BoardView
               prompts={prompts}
-              selectedItem={selectedItem}
-              onSelectItem={(p) => setSelectedItem(p)}
-              onDeletePrompt={handleDeletePrompt}
-              zoomLevel={zoomLevel}
-              onStartNewProject={handleStartNewProject}
-              onOpenImageViewer={(p) => {
-                setSelectedItem(p);
-                setImageViewerOpen(true);
+              currentSeries={currentSeries}
+              renderingIds={renderingIds}
+              onUpdateShot={handleUpdateShot}
+              onRenderShotImage={handleRenderShotImage}
+              onBatchRenderAll={(onlyMissing) => runBatchImageRender(prompts, onlyMissing)}
+              onDeleteShot={handleDeleteShot}
+              onAddShot={handleAddShot}
+              onUploadShotImage={handleUploadShotImage}
+              onSwitchToBulkEditor={() => setActiveView('bulk_editor')}
+            />
+          ) : (
+            <ShotListView
+              mode={activeView === 'shotlist' ? 'shotlist' : 'bulk_editor'}
+              prompts={prompts}
+              preCommitDraft={preCommitDraft}
+              onCancelDraft={() => {
+                setPreCommitDraft(null);
+                setActiveView('board');
               }}
-              onGenerateImageForShot={handleGenerateImageForShot}
-              onEditPrompt={(p) => {
-                setSelectedItem(p);
-                setEditShotModalOpen(true);
-              }}
+              onCommitDraftAndRender={handleCommitDraftAndRender}
+              onSaveBulkEdits={handleSaveBulkEdits}
+              onSaveBulkAndRenderAll={handleSaveBulkAndRenderAll}
+              onRenderSingleShot={handleRenderShotImage}
+              renderingIds={renderingIds}
+              onBackToBoard={() => setActiveView('board')}
             />
           )}
-        </div>
-
-        {/* Right Detail Inspector (Desktop Only, on Board View) */}
-        {activeStep === 'board' && selectedItem && (
-          <div className="hidden lg:block w-80 xl:w-96 border-l border-stone-200 bg-white overflow-y-auto shadow-xs">
-            <DetailInspector
-              item={selectedItem}
-              onClose={() => setSelectedItem(null)}
-              onDelete={handleDeletePrompt}
-              onOpenEditModal={(p) => {
-                setSelectedItem(p);
-                setEditShotModalOpen(true);
-              }}
-              onGenerateImage={() => handleGenerateImageForShot(selectedItem)}
-              onOpenImageViewer={(p) => {
-                setSelectedItem(p);
-                setImageViewerOpen(true);
-              }}
-              prompts={prompts}
-              onSelectOtherItem={(id) => {
-                const found = prompts.find((p) => p.id === id);
-                if (found) setSelectedItem(found);
-              }}
-            />
-          </div>
-        )}
+        </main>
       </div>
 
-      {/* 4. Modals */}
       {/* Settings Modal */}
       <SettingsModal
         isOpen={settingsModalOpen}
         onClose={() => setSettingsModalOpen(false)}
       />
-
-      {/* Image Viewer Fullscreen Modal */}
-      {imageViewerOpen && selectedItem && (
-        <ImageViewerModal
-          isOpen={imageViewerOpen}
-          onClose={() => setImageViewerOpen(false)}
-          prompt={selectedItem}
-        />
-      )}
-
-      {/* Edit Shot Modal */}
-      {editShotModalOpen && selectedItem && (
-        <EditShotModal
-          isOpen={editShotModalOpen}
-          onClose={() => setEditShotModalOpen(false)}
-          shot={selectedItem}
-          onShotUpdated={handleShotUpdated}
-          onGenerateImage={() => handleGenerateImageForShot(selectedItem)}
-        />
-      )}
-
-      {/* Delete Confirmation Modal */}
-      {deleteModalConfig && (
-        <DeleteConfirmModal
-          isOpen={!!deleteModalConfig}
-          onClose={() => setDeleteModalConfig(null)}
-          title={deleteModalConfig.title}
-          message={deleteModalConfig.message}
-          onConfirm={deleteModalConfig.onConfirm}
-        />
-      )}
     </div>
   );
 }

@@ -285,13 +285,29 @@ app.put('/api/prompts-batch', (req, res) => {
         step_number = COALESCE(?, step_number),
         sort_order = COALESCE(?, sort_order),
         camera_angle = COALESCE(?, camera_angle),
-        duration_seconds = COALESCE(?, duration_seconds)
+        duration_seconds = COALESCE(?, duration_seconds),
+        action_description = COALESCE(?, action_description),
+        dialogue_script = COALESCE(?, dialogue_script),
+        video_prompt = COALESCE(?, video_prompt),
+        audio_foley = COALESCE(?, audio_foley)
       WHERE id = ?
     `);
 
     for (const item of updates) {
       if (item.id) {
-        updateStmt.run(item.title, item.content, item.step_number, item.sort_order, item.camera_angle, item.duration_seconds, item.id);
+        updateStmt.run(
+          item.title,
+          item.content,
+          item.step_number,
+          item.sort_order,
+          item.camera_angle,
+          item.duration_seconds,
+          item.action_description,
+          item.dialogue_script,
+          item.video_prompt,
+          item.audio_foley,
+          item.id
+        );
       }
     }
 
@@ -369,20 +385,30 @@ app.post('/api/storyboard/ai-plan', async (req, res) => {
 
     if (parsedScript && parsedScript.shots && parsedScript.shots.length >= 2) {
       console.log(`[Script Parser] Directly detected ${parsedScript.shots.length} structured scenes from prompt.`);
+      const enrichedShots = await Promise.all(parsedScript.shots.map(async (s, idx) => {
+        let enPrompt = s.prompt || s.content || s.title || '';
+        if (/[\u0E00-\u0E7F]/.test(enPrompt)) {
+          const tr = await aiService.translateToEnglish(enPrompt);
+          enPrompt = `${s.camera_angle || 'Cinematic Shot'}, ${tr}, ${parsedScript.visual_style || chosenStyle}, hyper-realistic, crisp details, 8k`;
+        }
+        return {
+          ...s,
+          shot_number: idx + 1,
+          prompt: enPrompt,
+          content: enPrompt,
+          aspect_ratio: aspect_ratio,
+          image_url: s.image_url || getStoryboardSketch({ ...s, step_number: idx + 1, aspect_ratio: aspect_ratio })
+        };
+      }));
       planData = {
         project_title: parsedScript.project_title,
-        logline: `สตอรี่บอร์ด ${parsedScript.shots.length} ฉาก จากบทสคริปต์ (${parsedScript.visual_style || chosenStyle})`,
-        total_shots: parsedScript.shots.length,
-        total_scenes: parsedScript.shots.length,
+        logline: `สตอรี่บอร์ด ${enrichedShots.length} ฉาก จากบทสคริปต์ (${parsedScript.visual_style || chosenStyle})`,
+        total_shots: enrichedShots.length,
+        total_scenes: enrichedShots.length,
         target_duration: parsedScript.total_duration || target_duration,
         total_duration: parsedScript.total_duration || target_duration,
         pacing: pacing,
-        shots: parsedScript.shots.map((s, idx) => ({
-          ...s,
-          shot_number: idx + 1,
-          aspect_ratio: aspect_ratio,
-          image_url: s.image_url || getStoryboardSketch({ ...s, step_number: idx + 1, aspect_ratio: aspect_ratio })
-        }))
+        shots: enrichedShots
       };
     } else {
       // Call modern AI Director
