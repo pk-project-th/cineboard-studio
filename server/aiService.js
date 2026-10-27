@@ -7,6 +7,7 @@
 
 const config = require('./config');
 const { getStoryboardSketch } = require('./sketchHelper');
+const { parseMultiSceneScript, enrichSingleBeat } = require('./scriptParser');
 
 function sanitizeThaiPolite(text) {
   if (!text || typeof text !== 'string') return text;
@@ -457,174 +458,114 @@ async function generateSmartNeuralStoryboard(
   const rawText = String(concept || '').trim();
   const resolvedStyleEn = await resolveVisualStyle(style, rawText);
 
-  // Extract meaningful lines / bullets / sentences from user's input
-  let rawLines = rawText
-    .split(/\r?\n/)
-    .map(l => l.replace(/^[\s\-•*🎬🎥✨🚗🎧📱#]+/, '').trim())
-    .filter(l => l.length > 2 && !/^visual\s*style/i.test(l));
-
-  // If user typed a single block/paragraph without newlines, split by sentences or clauses
-  if (rawLines.length === 1 && rawLines[0].length > 70) {
-    const splitClauses = rawLines[0]
-      .split(/(?:[\.!?;]\s+|\s+(?:แล้ว|จากนั้น|ต่อมา|และให้เห็น|ตัดภาพไปที่|ตามด้วย)\s+)/)
-      .map(s => s.trim())
-      .filter(s => s.length > 4);
-    if (splitClauses.length >= 2) {
-      rawLines = [rawLines[0].slice(0, 50), ...splitClauses];
-    }
+  // 1. Direct Multi-Scene Detection (inline numbers, multiline numbers, or structured scene headers)
+  const parsed = parseMultiSceneScript(rawText);
+  if (parsed && parsed.shots && parsed.shots.length >= 2) {
+    return parsed;
   }
 
-  const mainTitle = (rawLines[0] || rawText || 'โปรเจกต์สตอรี่บอร์ดใหม่')
-    .replace(/^[🎬🎥✨🚗🎧📱#\s*\d.)\-]+/, '')
-    .slice(0, 65);
-  const bodyBeats = rawLines.length > 1 ? rawLines.slice(1) : [];
+  // 2. Short Prompt / Brief: Synthesize a realistic, sequential 6-shot storyline matching domain
+  const t = rawText.toLowerCase();
+  let synthesizedBeats = [];
 
-  // Automatic shot count: if user wrote multiple beats/lines, match them 1-to-1; otherwise create a complete 6-angle story arc
-  const count =
-    bodyBeats.length >= 2
-      ? Math.min(20, bodyBeats.length)
-      : requestedCount && requestedCount >= 2
-      ? requestedCount
-      : 6;
+  if (/ตกปลา|ปลา|คันเบ็ด|รอก|เหยื่อ|บ่อปลา|แม่น้ำ|angling|fish/.test(t)) {
+    synthesizedBeats = [
+      'ชวนเพื่อนซื้ออุปกรณ์ตกปลาและเตรียมพร้อมสำหรับการเดินทาง',
+      'เลือกซื้อคันเบ็ด รอกตกปลา และเหยื่อปลอมตัวโปรดในร้าน',
+      'ล่องเรือออกสู่ผืนน้ำท่ามกลางสายหมอกยามเช้า เหวี่ยงเบ็ดอย่างมีสมาธิ',
+      'คันเบ็ดโค้งงออย่างตื่นเต้น ดึงปลาตัวโตดิ้นกระโดดเหนือน้ำระยิบระยับ',
+      'พักแคมป์ปิ้งริมน้ำ ก่อไฟย่างปลาสดๆ บนเตาถ่าน กลิ่นหอมฉุยควันลอยกรุ่น',
+      'ล้อมวงรับประทานอาหาร ยิ้มหัวเราะชนแก้วแห่งความสุขในวันพักผ่อน'
+    ];
+  } else if (/รถ|โชว์รูม|ส่งมอบ|ขับขี่|กุญแจ|พวงมาลัย|กระจังหน้า|mazda|ev|car|suv|handover/.test(t)) {
+    synthesizedBeats = [
+      'เปิดตัวรถยนต์พรีเมียมคลุมผ้าซาตินในโชว์รูม แสงไฟสตูดิโอสะท้อนหรูหรา',
+      'ดึงผ้าคลุมออกอย่างช้าๆ เผยให้เห็นไฟหน้า LED และกระจังหน้าโฉบเฉี่ยว',
+      'พนักงานส่งมอบกล่องกุญแจหนังแท้และสมาร์ทคีย์ให้ลูกค้าด้วยรอยยิ้มอบอุ่น',
+      'ลูกค้ายิ้มดีใจ ถ่ายรูปร่วมกับครอบครัวหน้ารถติดโบว์แดงแห่งความภาคภูมิใจ',
+      'สัมผัสพวงมาลัยหนังแท้เย็บมือและหน้าปัดดิจิทัลสว่างขึ้นในห้องโดยสาร',
+      'ขับรถออกจากโชว์รูมสู่ถนนกว้างยามเย็น แสงอาทิตย์สีทองสะท้อนตัวถังเงางาม'
+    ];
+  } else if (/เซรั่ม|ผิว|ครีม|ดรอปเปอร์|แต่งหน้า|สกินแคร์|บำรุง|skin|serum|beauty/.test(t)) {
+    synthesizedBeats = [
+      'ขวดเซรั่มแก้วใสวางเด่นบนผิวน้ำกระทบแสงแดดเช้า มีหยดน้ำระยิบระยับ',
+      'ดรอปเปอร์แก้วค่อยๆ ปล่อยหยดเนื้อเซรั่มใสเข้มข้นตกลงสู่ผิวหลังมือ',
+      'ปลายนิ้วเกลี่ยเนื้อเซรั่มลงบนพวงแก้มอย่างอ่อนโยน ซึมซาบสู่ผิวทันที',
+      'ซูมเจาะลึกผิวหน้าที่ดูเรียบเนียน ฉ่ำวาว อิ่มน้ำ สุขภาพดีไร้ที่ติ',
+      'ส่องกระจกด้วยรอยยิ้มพึงพอใจและมั่นใจในผิวหน้าสดที่ดูสดใสเปล่งปลั่ง',
+      'ช็อตจบขวดเซรั่มคู่กับหยดน้ำและดอกไม้สีขาว พร้อมพื้นที่วางโลโก้แบรนด์'
+    ];
+  } else if (/กาแฟ|คาเฟ่|อาหาร|กิน|ย่าง|ทำอาหาร|ชิม|มัทฉะ|ครัว|cafe|food|cook|eat/.test(t)) {
+    synthesizedBeats = [
+      'ผลักประตูไม้เข้าสู่ร้าน กลิ่นหอมกรุ่นของอาหารและเครื่องดื่มลอยมาต้อนรับ',
+      'เชฟหรือบาริสต้ากำลังรังสรรค์เมนูอย่างตั้งใจ เทเครื่องดื่มแยกชั้นสวยงาม',
+      'ภาพโคลสอัพจานอาหารหรือขนมซิกเนเจอร์ ควันหอมฉุย วัตถุดิบคุณภาพพรีเมียม',
+      'ตักอาหารคำโตเข้าปาก สีหน้ายิ้มกว้างด้วยความประทับใจในรสชาติกลมกล่อม',
+      'บรรยากาศลูกค้านั่งผ่อนคลายริมหน้าต่างรับแสงแดดอุ่น สบายๆ สไตล์สโลว์ไลฟ์',
+      'ภาพจบแก้วเครื่องดื่มและมุมโปรดของร้านพร้อมเชิญชวนทุกคนมาสัมผัส'
+    ];
+  } else {
+    synthesizedBeats = [
+      `เปิดฉากภาพมุมกว้างสร้างบรรยากาศและแนะนำเรื่องราวของ ${rawText}`,
+      `แนะนำตัวละครหลักและจุดเริ่มต้นของความต้องการหรือเป้าหมาย`,
+      `การลงมือทำและเผชิญความท้าทายด้วยความมุ่งมั่น`,
+      `จุดไคลแม็กซ์หรือช่วงเวลาแห่งความตื่นเต้นที่สุดของเรื่องราว`,
+      `ผลลัพธ์แห่งความสำเร็จ รอยยิ้ม และความสุขที่ได้รับ`,
+      `บทสรุปปิดท้ายอันน่าประทับใจและทรงพลัง พร้อมส่งต่อแรงบันดาลใจ`
+    ];
+  }
 
-  const durPerShot = 3.0;
-
-  // Translate the main topic and all beats to English in a SINGLE batch request (~200ms total)
-  const batchText = [mainTitle, ...bodyBeats].join('\n');
-  const batchTranslated = await translateToEnglish(batchText);
-  const batchLinesEn = batchTranslated.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
-  const mainTopicEn = batchLinesEn[0] || 'Luxury modern commercial scene';
-  const translatedBeats = bodyBeats.map((_, idx) => batchLinesEn[idx + 1] || batchLinesEn[0] || mainTopicEn);
-
-  // Narrative arc templates for expanding a short brief into N distinct cinematic shots
-  const narrativeStages = [
-    {
-      angle: 'Wide Establishing Shot',
-      th: 'ภาพมุมกว้างเปิดฉากสถานที่และบรรยากาศหลัก',
-      lens: '24mm Wide',
-      move: 'Slow Dolly Push-In',
-      stageTh: (topic) => `เปิดฉากมุมกว้างให้เห็นบรรยากาศโดยรวมของ ${topic} แสงธรรมชาติและมิติสถานที่ชัดเจน`,
-      stageEn: (topicEn) => `Wide establishing shot showing the full environment and atmosphere of ${topicEn}, natural cinematic lighting, deep composition`,
-      foley: 'เสียงบรรยากาศสถานที่จริง (Ambient Room / Exterior Tone) นุ่มลึกสมจริง',
-      vo: (topic) => `เปิดเรื่องราวของ ${topic} ด้วยบรรยากาศที่ดึงดูดสายตาตั้งแต่หยดแรกครับ`
-    },
-    {
-      angle: 'Medium Shot',
-      th: 'ภาพมุมปานกลางโฟกัสตัวละครและการกระทำหลัก',
-      lens: '35mm Anamorphic',
-      move: 'Smooth Gimbal Tracking',
-      stageTh: (topic) => `โฟกัสการเคลื่อนไหวและการดำเนินเรื่องหลักของ ${topic} เห็นรายละเอียดท่าทางชัดเจน`,
-      stageEn: (topicEn) => `Medium shot focusing on the main subject and key action of ${topicEn}, natural candid interaction, shallow depth of field`,
-      foley: 'เสียงการเคลื่อนไหวของตัวละครและวัตถุหลักในฉากอย่างคมชัด',
-      vo: () => `ทุกรายละเอียดถูกออกแบบมาเพื่อตอบโจทย์การใช้งานจริงอย่างลงตัวครับ`
-    },
-    {
-      angle: 'Extreme Close-Up Macro',
-      th: 'ภาพโคลสอัพมาโครเจาะลึกพื้นผิวและวัสดุพรีเมียม',
-      lens: '85mm Macro',
-      move: 'Subtle Rack Focus',
-      stageTh: (topic) => `เจาะลึกรายละเอียดพื้นผิว วัสดุ และงานประกอบอันประณีตของ ${topic} คมชัดระดับมาโคร`,
-      stageEn: (topicEn) => `Extreme close-up macro shot highlighting the fine texture, craftsmanship, and intricate details of ${topicEn}, crisp bokeh`,
-      foley: 'เสียงสัมผัสพื้นผิวระยะใกล้ (Crisp Tactile ASMR Foley) ชัดเจนทุกมิติ',
-      vo: () => `สัมผัสความประณีตและคุณภาพระดับพรีเมียมที่แตกต่างอย่างชัดเจนครับ`
-    },
-    {
-      angle: 'Over-The-Shoulder (OTS)',
-      th: 'มุมมองข้ามไหล่เห็นการใช้งานและฟีเจอร์เด่น',
-      lens: '50mm Prime',
-      move: 'Gentle Handheld Follow',
-      stageTh: (topic) => `มุมมองข้ามไหล่เผยให้เห็นการใช้งานจริงและฟังก์ชันสำคัญของ ${topic}`,
-      stageEn: (topicEn) => `Over-the-shoulder shot revealing hands-on interaction and core features of ${topicEn}, warm studio lighting`,
-      foley: 'เสียงคลิกปุ่มควบคุมและเสียงตอบสนองของอุปกรณ์อย่างนุ่มนวล',
-      vo: () => `ควบคุมและใช้งานได้อย่างราบรื่น ตอบสนองทุกจังหวะชีวิตครับ`
-    },
-    {
-      angle: 'Point-of-View (POV)',
-      th: 'มุมมองสายตาผู้ใช้งานจริง (First-Person POV)',
-      lens: '28mm POV',
-      move: 'First-Person Perspective',
-      stageTh: (topic) => `มุมมองแทนสายตาผู้ชมที่ได้สัมผัสและใช้งาน ${topic} ด้วยตัวเองอย่างใกล้ชิด`,
-      stageEn: (topicEn) => `First-person POV shot looking directly at ${topicEn}, hands interacting naturally in foreground, immersive perspective`,
-      foley: 'เสียงลมหายใจเบาๆ ผสมเสียงสัมผัสจริงเสมือนอยู่ในเหตุการณ์',
-      vo: () => `ให้คุณได้สัมผัสประสบการณ์จริงด้วยมุมมองที่ใกล้ชิดที่สุดครับ`
-    },
-    {
-      angle: 'Close-Up Reaction',
-      th: 'ภาพโคลสอัพสีหน้าและรอยยิ้มแห่งความประทับใจ',
-      lens: '85mm Portrait',
-      move: 'Static Lock-Off',
-      stageTh: (topic) => `โคลสอัพสีหน้าแววตาและรอยยิ้มแห่งความพึงพอใจหลังจากได้สัมผัส ${topic}`,
-      stageEn: (topicEn) => `Close-up portrait shot of a genuinely smiling satisfied person experiencing ${topicEn}, warm golden backlight, expressive eyes`,
-      foley: 'เสียงดนตรีประกอบค่อยๆ ยกระดับอารมณ์ความประทับใจ',
-      vo: () => `ความประทับใจที่สะท้อนออกมาผ่านรอยยิ้มและความมั่นใจในทุกครั้งที่ใช้งานครับ`
-    },
-    {
-      angle: 'Low-Angle Hero Tracking',
-      th: 'มุมเสยเคลื่อนตามสร้างความสง่างามทรงพลัง',
-      lens: '35mm Wide',
-      move: 'Low-Angle Dolly Track',
-      stageTh: (topic) => `ภาพมุมต่ำเคลื่อนตาม ${topic} โชว์เส้นสายและรูปทรงที่สง่างามทรงพลัง`,
-      stageEn: (topicEn) => `Dynamic low-angle hero tracking shot of ${topicEn}, dramatic rim lighting, sleek reflections, powerful presence`,
-      foley: 'เสียงเคลื่อนที่ทรงพลังและเสียงแอมเบียนต์กว้างขวาง',
-      vo: () => `โดดเด่นทุกองศา สะกดทุกสายตาในทุกการเคลื่อนไหวครับ`
-    },
-    {
-      angle: 'Cinematic Finale Hero Shot',
-      th: 'ภาพจบสรุปเรื่องราวและภาพจำแบรนด์อันทรงพลัง',
-      lens: '50mm Master',
-      move: 'Slow Crane Pull-Back',
-      stageTh: (topic) => `ภาพจบสุดประทับใจของ ${topic} ท่ามกลางแสงสีทองสวยงาม พร้อมข้อความสรุปจบ`,
-      stageEn: (topicEn) => `Iconic cinematic finale hero shot of ${topicEn} in golden hour lighting, editorial composition, commercial masterpiece`,
-      foley: 'เสียงดนตรีฟินาเล่จบอย่างสง่างามและน่าจดจำ',
-      vo: (topic) => `${topic} คำตอบที่สมบูรณ์แบบสำหรับคุณตั้งแต่วันนี้ครับ`
-    }
-  ];
-
-  const shots = [];
-  for (let i = 0; i < count; i++) {
-    const hasSpecificBeat = bodyBeats.length >= 2 && i < bodyBeats.length;
-    const rawBeatTh = hasSpecificBeat ? bodyBeats[i].replace(/^\d+[\.\)]\s*/, '').trim() : '';
-    const stage = inferBestCameraStage(rawBeatTh, i, camera_breakdown, narrativeStages);
-    const shotNum = i + 1;
-
-    const beatTh = hasSpecificBeat ? rawBeatTh : stage.stageTh(mainTitle);
-    const beatEn = hasSpecificBeat ? `${mainTopicEn}, ${translatedBeats[i]}` : stage.stageEn(mainTopicEn);
-
-    const shortTitleTh = hasSpecificBeat
-      ? beatTh.slice(0, 48)
-      : stage.th;
+  const cleanTitle = rawText.replace(/^[🎬🎥✨🚗🎧📱#\s*\d.)\-]+/, '').slice(0, 60) || 'โปรเจกต์สตอรี่บอร์ดงานภาพยนตร์';
+  const shots = synthesizedBeats.map((beat, idx) => {
+    const shotNum = idx + 1;
+    const enriched = enrichSingleBeat(cleanTitle, beat, idx, synthesizedBeats.length, resolvedStyleEn);
+    const titleClean = `ฉากที่ ${shotNum}: ${beat.slice(0, 40)}`;
 
     const shotData = {
       shot_number: shotNum,
       scene_number: shotNum,
-      scene_title: `ฉากที่ ${shotNum}: ${shortTitleTh}`,
-      title: `ช็อตที่ ${shotNum}: ${shortTitleTh}`,
-      camera_angle: stage.angle,
-      camera_angle_th: stage.th,
-      camera_movement: stage.move,
-      lens_focal: stage.lens,
-      action_description: hasSpecificBeat
-        ? `${beatTh} (${stage.th} • ${stage.lens})`
-        : beatTh,
-      dialogue: stage.vo(mainTitle),
-      audio_foley: stage.foley,
-      on_screen_text: shotNum === count ? mainTitle.slice(0, 35) : '',
-      prompt: `${stage.angle}, ${stage.lens} lens, ${beatEn}, ${resolvedStyleEn}, hyper-realistic, crisp details, 8k`,
-      video_prompt: `${stage.move} camera movement, ${stage.angle} of ${beatEn}, smooth 60fps cinematic motion, photorealistic`,
-      duration_seconds: durPerShot,
-      aspect_ratio: aspect_ratio
+      scene_title: titleClean,
+      title: titleClean,
+      subtitle: `${enriched.camera_angle_th} • ${enriched.lens_focal}`,
+      camera_angle: enriched.camera_angle,
+      camera_angle_th: enriched.camera_angle_th,
+      camera_movement: enriched.camera_movement,
+      lens_focal: enriched.lens_focal,
+      duration_seconds: 3.0,
+      action_description: enriched.action_description,
+      dialogue: enriched.dialogue,
+      audio_foley: enriched.audio_foley,
+      on_screen_text: shotNum === synthesizedBeats.length ? cleanTitle.slice(0, 35) : '',
+      prompt: enriched.prompt,
+      video_prompt: enriched.video_prompt,
+      live_action_guide: `มุมกล้อง: ${enriched.camera_angle} | เลนส์: ${enriched.lens_focal} | จัดแสงธรรมชาติเน้นมิติความลึก (Depth of Field)`,
+      visual_style: resolvedStyleEn,
+      aspect_ratio: aspect_ratio || '16:9'
     };
-
     shotData.image_url = getStoryboardSketch(shotData);
-    shots.push(shotData);
-  }
+    return shotData;
+  });
+
+  let curTime = 0;
+  shots.forEach((s) => {
+    const startSec = curTime;
+    const endSec = Math.round((startSec + s.duration_seconds) * 10) / 10;
+    curTime = endSec;
+    const formatSec = (seconds) => {
+      const mins = Math.floor(seconds / 60);
+      const s = seconds % 60;
+      const sStr = s < 10 ? '0' + s.toFixed(1) : s.toFixed(1);
+      return `${mins}:${sStr}`;
+    };
+    s.timecode = `${formatSec(startSec)} - ${formatSec(endSec)}`;
+  });
 
   return {
-    project_title: mainTitle,
-    logline: `สตอรี่บอร์ด ${count} ช็อต ถ่ายทอดเรื่องราว "${mainTitle}"`,
-    total_shots: count,
-    total_duration: count * durPerShot,
-    target_duration: count * durPerShot,
+    project_title: cleanTitle,
+    logline: `สตอรี่บอร์ด ${shots.length} ช็อต ถ่ายทอดเรื่องราว "${cleanTitle}"`,
+    total_shots: shots.length,
+    total_duration: curTime,
+    target_duration: curTime,
     shots
   };
 }

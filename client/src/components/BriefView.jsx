@@ -10,10 +10,25 @@ import {
   RefreshCw,
   AlertCircle,
   ClipboardPaste,
-  Trash2
+  Trash2,
+  Lightbulb,
+  ChevronDown,
+  ChevronUp
 } from 'lucide-react';
 
 const PRESET_TEMPLATES = [
+  {
+    id: 'fishing_trip',
+    badge: '🎣 ทริปตกปลา & แคมป์ปิ้ง (6 ฉาก)',
+    aspect: '16:9',
+    text: `คลิปเชิญชวนตกปลาวันหยุดพักผ่อนริมน้ำ
+1. ชวนกันไปซื้ออุปกรณ์ตกปลาในร้านโปรด
+2. เลือกสินค้า คันเบ็ดและเหยื่อปลอมตัวเด็ด
+3. ออกไปตกปลา ล่องเรือกลางสายหมอกยามเช้า
+4. ได้ปลาตัวโต คันเบ็ดโค้งงอดึงสู้ปลาอย่างตื่นเต้น
+5. นำมาทำอาหาร ย่างเตาถ่านควันหอมฉุยริมแคมป์
+6. กินอย่างเอร็ดอร่อย ล้อมวงสังสรรค์ฉลองความสำเร็จ`
+  },
   {
     id: 'mazda_cx6e',
     badge: '🚗 ส่งมอบรถ Mazda CX-6e',
@@ -108,6 +123,70 @@ const CAMERA_BREAKDOWN_MODES = [
   }
 ];
 
+// Interactive Co-Director Question Options
+const CO_DIRECTOR_QUESTIONS = {
+  moods: [
+    { id: 'cozy_nature', label: '🏕️ แคมป์ปิ้งอบอุ่น ชิลล์ธรรมชาติ' },
+    { id: 'energetic_adventure', label: '⚡ แอคชั่น ผจญภัย สนุกมันส์' },
+    { id: 'cinematic_luxury', label: '💎 โฆษณาพรีเมียม สวยหรูคมชัด' },
+    { id: 'friendship_vlog', label: '🎒 Vlog เพื่อนฝูง มิตรภาพสดใส' },
+    { id: 'asmr_peace', label: '🎧 ASMR สมาธิ เสียงและภาพสงบ' }
+  ],
+  locations: [
+    { id: 'misty_dam', label: '🌅 เขื่อนหมอกเช้า & ลำธารธรรมชาติ' },
+    { id: 'sea_boat', label: '⛵ ออกเรือกลางทะเล แดดบ่ายประกายคลื่น' },
+    { id: 'city_fishery', label: '🎣 บ่อตกปลาธรรมชาติ ชิลล์สบาย' },
+    { id: 'river_sunset', label: '🏕️ แคมป์ไฟริมน้ำ พระอาทิตย์ตกดิน' },
+    { id: 'modern_showroom', label: '🏬 โชว์รูม / ร้านอุปกรณ์โมเดิร์น' }
+  ],
+  endings: [
+    { id: 'grill_eat', label: '🍳 ย่างเตาถ่านสดๆ กินอร่อยริมน้ำ' },
+    { id: 'trophy_photo', label: '🏆 ดึงปลาตัวยักษ์ ถ่ายรูปเฮฮาฉลอง' },
+    { id: 'catch_release', label: '🌊 สัมผัสปลาอย่างอ่อนโยนแล้วปล่อยคืนน้ำ' },
+    { id: 'campfire_cheers', label: '🍻 นั่งล้อมวงคุยกันชนแก้วรอบกองไฟ' }
+  ]
+};
+
+// Robust beat extraction from text
+function extractScriptBeats(text) {
+  if (!text || !text.trim()) return [];
+
+  // 1. Scene / Shot headers
+  const sceneRegex = /(?:^|\n)\s*(?:Scene|SCENE|ฉากที่|ช็อตที่|Shot|SHOT)\s*(\d+)[\s\:\.\-–]*(.*?)(?=(?:\n\s*(?:Scene|SCENE|ฉากที่|ช็อตที่|Shot|SHOT)\s*\d+)|$)/gis;
+  let matches = [...text.matchAll(sceneRegex)];
+  if (matches.length >= 2) {
+    return matches.map((m) => {
+      const firstLine = m[2].trim().split('\n')[0].replace(/^[:\-\s]+/, '');
+      return firstLine || `ฉากที่ ${m[1]}`;
+    });
+  }
+
+  // 2. Multiline numbered list: 1. A \n 2. B
+  const multiLineNumRegex = /(?:^|\n)\s*(\d+)[\.\)]\s*(.*?)(?=(?:\n\s*\d+[\.\)])|$)/gs;
+  matches = [...text.matchAll(multiLineNumRegex)];
+  if (matches.length >= 2) {
+    return matches.map((m) => {
+      const firstLine = m[2].trim().split('\n')[0].replace(/^[:\-\s]+/, '');
+      return firstLine || `ข้อ ${m[1]}`;
+    });
+  }
+
+  // 3. Inline numbered list on a single line: 1. A 2. B 3. C
+  const inlineNumRegex = /(?:^|\s)(\d+)[\.\)]\s*([^\d\n\r]+?)(?=(?:\s+\d+[\.\)])|$)/g;
+  matches = [...text.matchAll(inlineNumRegex)];
+  if (matches.length >= 2) {
+    return matches.map((m) => m[2].trim());
+  }
+
+  // 4. Arrow sequence: A -> B -> C
+  if (text.includes('->') || text.includes('➔') || text.includes('=>')) {
+    const parts = text.split(/\s*(?:->|➔|=>)\s*/).filter((p) => p.trim().length > 1);
+    if (parts.length >= 2) return parts.map((p) => p.trim());
+  }
+
+  return [];
+}
+
 export default function BriefView({
   onPlanAndAutoRender,
   onPlanForReview,
@@ -120,22 +199,24 @@ export default function BriefView({
   const [errorMsg, setErrorMsg] = useState('');
   const [pasteSuccess, setPasteSuccess] = useState(false);
 
-  // Auto-detect how many scenes/beats are in the user's text
+  // Co-Director Assistant State
+  const [coDirectorOpen, setCoDirectorOpen] = useState(false);
+  const [selectedMood, setSelectedMood] = useState(CO_DIRECTOR_QUESTIONS.moods[0].id);
+  const [selectedLocation, setSelectedLocation] = useState(CO_DIRECTOR_QUESTIONS.locations[0].id);
+  const [selectedEnding, setSelectedEnding] = useState(CO_DIRECTOR_QUESTIONS.endings[0].id);
+
+  // Auto-detect beats and scene count
+  const detectedBeats = useMemo(() => {
+    return extractScriptBeats(storyConcept);
+  }, [storyConcept]);
+
   const detectedScenesCount = useMemo(() => {
     if (!storyConcept.trim()) return 0;
-    const sceneMatches = storyConcept.match(/(?:Scene|SCENE|ฉากที่|ช็อตที่|Shot|SHOT)\s*\d+/g);
-    if (sceneMatches && sceneMatches.length >= 2) {
-      return sceneMatches.length;
+    if (detectedBeats.length >= 2) {
+      return detectedBeats.length;
     }
-    const rawLines = storyConcept
-      .split(/\r?\n/)
-      .map((l) => l.trim())
-      .filter((l) => l.length > 2 && !/^visual\s*style/i.test(l));
-    if (rawLines.length > 2) {
-      return rawLines.length - 1;
-    }
-    return 6; // Default narrative arc of 6 camera angles when user writes a short 1-line brief
-  }, [storyConcept]);
+    return 6; // Smart AI default narrative arc for short briefs
+  }, [storyConcept, detectedBeats]);
 
   const handlePasteFromClipboard = async () => {
     try {
@@ -156,6 +237,42 @@ export default function BriefView({
     setAspectRatio(preset.aspect);
     setVisualStyle('auto');
     setErrorMsg('');
+  };
+
+  // Co-Director synthesizer: Build a rich 6-beat script from user's topic + chosen options
+  const handleSynthesizeCoDirectorPlan = () => {
+    const raw = storyConcept.replace(/^[🎬🎥✨🚗🎧📱#\s*\d.)\-]+/, '').split('\n')[0].trim();
+    const topic = raw && raw.length > 2 && raw.length < 80 ? raw : 'คลิปเชิญชวนไปเที่ยวและตกปลาวันหยุด';
+
+    const moodObj = CO_DIRECTOR_QUESTIONS.moods.find((m) => m.id === selectedMood) || CO_DIRECTOR_QUESTIONS.moods[0];
+    const locObj = CO_DIRECTOR_QUESTIONS.locations.find((l) => l.id === selectedLocation) || CO_DIRECTOR_QUESTIONS.locations[0];
+    const endObj = CO_DIRECTOR_QUESTIONS.endings.find((e) => e.id === selectedEnding) || CO_DIRECTOR_QUESTIONS.endings[0];
+
+    // Check domain
+    const isFish = /ตกปลา|ปลา|angling|fish/i.test(topic);
+
+    let scriptText = '';
+    if (isFish) {
+      scriptText = `${topic} (${moodObj.label} ณ ${locObj.label})
+1. ชวนเพื่อนแวะร้านอุปกรณ์ตกปลา เลือกคันเบ็ดและเหยื่อตัวเด็ด
+2. เดินทางถึงหมายตกปลา แสงอาทิตย์ยามเช้าสะท้อนผิวน้ำ มีหมอกบางๆ
+3. ลงเรือพายออกไปกลางน้ำ หวดคันเบ็ดทอดสายลงสู่ผิวน้ำนิ่ง
+4. คันเบ็ดโค้งงอ สายเบ็ดดึงตึง แอคชั่นดึงสู้ปลาตัวใหญ่ขึ้นมาได้สำเร็จ
+5. นำปลาที่ตกได้สดๆ มาทำอาหาร ก่อเตาถ่านย่างปลาหอมกรุ่นริมแคมป์
+6. ${endObj.label.replace(/^[\uD800-\uDBFF\uDC00-\uDFFF\s]+/, '')} ท่ามกลางบรรยากาศแสนอบอุ่น`;
+    } else {
+      scriptText = `${topic} (${moodObj.label} ณ ${locObj.label})
+1. เปิดฉากแนะนำสถานที่และบรรยากาศโดยรอบ แสงธรรมชาติสวยงาม
+2. ตัวละครหลักเริ่มลงมือเตรียมพร้อมและเลือกอุปกรณ์ชิ้นสำคัญ
+3. ก้าวเข้าสู่ช่วงเวลาสำคัญของการเดินทางและสัมผัสประสบการณ์ตรง
+4. ช่วงเวลาไคลแม็กซ์ที่น่าตื่นเต้น ประสบความสำเร็จตามเป้าหมาย
+5. บันทึกรายละเอียดความประทับใจและรอยยิ้มแห่งความภาคภูมิใจ
+6. ${endObj.label.replace(/^[\uD800-\uDBFF\uDC00-\uDFFF\s]+/, '')} ปิดท้ายเรื่องราวอย่างน่าประทับใจ`;
+    }
+
+    setStoryConcept(scriptText);
+    setErrorMsg('');
+    setCoDirectorOpen(false);
   };
 
   const handleSubmit = async (reviewFirst = false) => {
@@ -182,7 +299,7 @@ export default function BriefView({
   };
 
   return (
-    <aside className="w-full lg:w-[375px] xl:w-[400px] shrink-0 bg-[#10131B] border-b lg:border-b-0 lg:border-r border-slate-800/90 flex flex-col lg:h-[calc(100vh-3.5rem)] lg:sticky lg:top-14 overflow-y-auto no-print">
+    <aside className="w-full lg:w-[375px] xl:w-[410px] shrink-0 bg-[#10131B] border-b lg:border-b-0 lg:border-r border-slate-800/90 flex flex-col lg:h-[calc(100vh-3.5rem)] lg:sticky lg:top-14 overflow-y-auto no-print">
       <div className="p-4 sm:p-5 space-y-4 flex-1">
         {/* Header */}
         <div className="flex items-center justify-between gap-2">
@@ -192,7 +309,7 @@ export default function BriefView({
               <span>ผู้กำกับสตอรี่บอร์ด AI</span>
             </h2>
             <p className="text-[11px] text-slate-400 mt-0.5">
-              วาง Prompt หรือพิมพ์เนื้อเรื่อง ระบบจะแยกฉากและมุมกล้องให้อัตโนมัติ
+              พิมพ์สั้นๆ หรือวางบรีฟ ระบบจะแตกช็อตและจัดมุมกล้องให้อัตโนมัติ
             </p>
           </div>
           {storyConcept.trim() && (
@@ -206,7 +323,7 @@ export default function BriefView({
         {/* Quick Presets */}
         <div className="space-y-1.5">
           <span className="text-[11px] font-semibold text-slate-400 block">
-            ตัวอย่างพร้อมใช้ (คลิกเพื่อลองทันที):
+            ตัวอย่างบทสตอรี่บอร์ดพร้อมใช้ (คลิกเพื่อลอง):
           </span>
           <div className="flex flex-wrap gap-1.5">
             {PRESET_TEMPLATES.map((preset) => (
@@ -254,13 +371,175 @@ export default function BriefView({
           <textarea
             value={storyConcept}
             onChange={(e) => setStoryConcept(e.target.value)}
-            rows={7}
-            placeholder="กดปุ่ม 'กดวาง Prompt' ด้านบน หรือพิมพ์เนื้อเรื่อง/บรีฟของคุณที่นี่ได้เลยครับ (รองรับทั้งข้อความสั้นๆ ข้อความเรียงข้อ 1..N และบท Scene 1..N)..."
+            rows={6}
+            placeholder="พิมพ์หรือวางเนื้อเรื่องที่นี่ได้เลยครับ รองรับทั้งข้อความสั้นๆ เช่น 'คลิปชวนตกปลา', ข้อความแบบ 1..6, หรือ Scene 1..N..."
             className="w-full p-3.5 rounded-xl bg-[#0B0D11] border border-slate-800 focus:border-amber-500/70 focus:outline-none text-xs text-slate-100 placeholder:text-slate-600 leading-relaxed resize-y font-sans"
           />
+
+          {/* Visual Storyboard Beat Flow Ribbon */}
+          {detectedBeats.length >= 2 ? (
+            <div className="p-2.5 rounded-xl bg-slate-900/90 border border-emerald-500/30 text-xs">
+              <div className="flex items-center justify-between text-emerald-400 font-bold mb-1.5">
+                <span className="flex items-center gap-1.5 text-[11px]">
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                  <span>ตรวจพบโครงเรื่อง {detectedBeats.length} ฉากต่อเนื่อง:</span>
+                </span>
+                <span className="text-[10px] text-slate-400 font-normal">ระบบจะสร้างมุมกล้องให้ครบทุกช็อต</span>
+              </div>
+              <div className="flex flex-wrap items-center gap-1">
+                {detectedBeats.map((beat, idx) => (
+                  <span key={idx} className="flex items-center gap-1">
+                    <span className="px-2 py-0.5 rounded-md bg-emerald-500/15 border border-emerald-500/30 text-[10px] text-emerald-200 font-medium max-w-[170px] truncate" title={beat}>
+                      {idx + 1}. {beat}
+                    </span>
+                    {idx < detectedBeats.length - 1 && (
+                      <span className="text-slate-500 text-[10px]">➔</span>
+                    )}
+                  </span>
+                ))}
+              </div>
+            </div>
+          ) : storyConcept.trim() ? (
+            <div className="p-2 rounded-xl bg-amber-500/10 border border-amber-500/20 text-[11px] text-amber-200/90 flex items-center justify-between gap-2">
+              <span className="flex items-center gap-1.5">
+                <Lightbulb className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                <span>ข้อความสั้น: AI จะสังเคราะห์เป็น 6 ช็อตโปรดักชันให้อัตโนมัติ</span>
+              </span>
+              <button
+                type="button"
+                onClick={() => setCoDirectorOpen(true)}
+                className="text-[10px] font-bold text-amber-300 underline hover:text-amber-200 shrink-0 cursor-pointer"
+              >
+                เลือกสไตล์เพิ่ม
+              </button>
+            </div>
+          ) : null}
         </div>
 
-        {/* Camera & Story Breakdown Mode (Replaces fixed Shot Count!) */}
+        {/* Co-Director Assistant (ถามเพิ่มเติม / ขยายไอเดีย) */}
+        <div className="rounded-xl bg-[#141824] border border-amber-500/30 overflow-hidden transition-all">
+          <button
+            type="button"
+            onClick={() => setCoDirectorOpen(!coDirectorOpen)}
+            className="w-full p-2.5 flex items-center justify-between gap-2 text-left hover:bg-slate-800/40 transition-colors cursor-pointer"
+          >
+            <div className="flex items-center gap-2">
+              <div className="w-6 h-6 rounded-lg bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400">
+                <Lightbulb className="w-3.5 h-3.5" />
+              </div>
+              <div>
+                <span className="text-xs font-bold text-white flex items-center gap-1.5">
+                  <span>ผู้ช่วยผู้กำกับ AI (ถามเพิ่มเติม / ขยายไอเดีย)</span>
+                  <span className="px-1.5 py-0.2 rounded text-[9px] bg-amber-500 text-slate-950 font-black">ฉลาดขึ้น</span>
+                </span>
+                <p className="text-[10px] text-slate-400">
+                  เลือกแนวทาง 3 ข้อง่ายๆ เพื่อให้ AI ช่วยเขียนบท 6 ฉากที่ตรงใจคุณที่สุด
+                </p>
+              </div>
+            </div>
+            {coDirectorOpen ? (
+              <ChevronUp className="w-4 h-4 text-slate-400 shrink-0" />
+            ) : (
+              <ChevronDown className="w-4 h-4 text-slate-400 shrink-0" />
+            )}
+          </button>
+
+          {coDirectorOpen && (
+            <div className="p-3.5 border-t border-slate-800/80 space-y-3 bg-[#0E1119]">
+              {/* Question 1: Mood */}
+              <div className="space-y-1.5">
+                <label className="text-[11px] font-bold text-amber-300 flex items-center gap-1">
+                  <span>1. โทนอารมณ์ / สไตล์ของคลิป (Mood & Vibe)</span>
+                </label>
+                <div className="flex flex-wrap gap-1.5">
+                  {CO_DIRECTOR_QUESTIONS.moods.map((m) => {
+                    const active = selectedMood === m.id;
+                    return (
+                      <button
+                        key={m.id}
+                        type="button"
+                        onClick={() => setSelectedMood(m.id)}
+                        className={`px-2 py-1 rounded-lg text-[10px] font-semibold border transition-all cursor-pointer ${
+                          active
+                            ? 'bg-amber-500 text-slate-950 border-amber-400 font-bold'
+                            : 'bg-[#171C28] text-slate-300 border-slate-700/70 hover:border-slate-500'
+                        }`}
+                      >
+                        {m.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Question 2: Location */}
+              <div className="space-y-1.5">
+                <label className="text-[11px] font-bold text-amber-300 flex items-center gap-1">
+                  <span>2. โลเคชั่นหลัก (Location & Setting)</span>
+                </label>
+                <div className="flex flex-wrap gap-1.5">
+                  {CO_DIRECTOR_QUESTIONS.locations.map((loc) => {
+                    const active = selectedLocation === loc.id;
+                    return (
+                      <button
+                        key={loc.id}
+                        type="button"
+                        onClick={() => setSelectedLocation(loc.id)}
+                        className={`px-2 py-1 rounded-lg text-[10px] font-semibold border transition-all cursor-pointer ${
+                          active
+                            ? 'bg-amber-500 text-slate-950 border-amber-400 font-bold'
+                            : 'bg-[#171C28] text-slate-300 border-slate-700/70 hover:border-slate-500'
+                        }`}
+                      >
+                        {loc.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Question 3: Climax & Ending */}
+              <div className="space-y-1.5">
+                <label className="text-[11px] font-bold text-amber-300 flex items-center gap-1">
+                  <span>3. ไฮไลท์การเล่าเรื่อง & ช็อตจบ (Climax & Ending)</span>
+                </label>
+                <div className="flex flex-wrap gap-1.5">
+                  {CO_DIRECTOR_QUESTIONS.endings.map((end) => {
+                    const active = selectedEnding === end.id;
+                    return (
+                      <button
+                        key={end.id}
+                        type="button"
+                        onClick={() => setSelectedEnding(end.id)}
+                        className={`px-2 py-1 rounded-lg text-[10px] font-semibold border transition-all cursor-pointer ${
+                          active
+                            ? 'bg-amber-500 text-slate-950 border-amber-400 font-bold'
+                            : 'bg-[#171C28] text-slate-300 border-slate-700/70 hover:border-slate-500'
+                        }`}
+                      >
+                        {end.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Action Button inside Assistant */}
+              <div className="pt-1">
+                <button
+                  type="button"
+                  onClick={handleSynthesizeCoDirectorPlan}
+                  className="w-full py-2 px-3 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-md shadow-emerald-900/30 transition-all cursor-pointer"
+                >
+                  <Sparkles className="w-3.5 h-3.5" />
+                  <span>✨ นำคำตอบไปสังเคราะห์เป็นบท 6 ฉากให้อัตโนมัติ</span>
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Camera & Story Breakdown Mode */}
         <div className="space-y-1.5">
           <label className="text-[11px] font-bold text-slate-300 flex items-center gap-1.5">
             <Camera className="w-3.5 h-3.5 text-amber-400" />
