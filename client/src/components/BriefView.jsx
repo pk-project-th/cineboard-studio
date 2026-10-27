@@ -13,13 +13,16 @@ import {
   Trash2,
   Lightbulb,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  Plus,
+  Minus,
+  Sliders
 } from 'lucide-react';
 
 const PRESET_TEMPLATES = [
   {
     id: 'fishing_trip',
-    badge: '🎣 ทริปตกปลา & แคมป์ปิ้ง (6 ฉาก)',
+    badge: '🎣 ทริปตกปลา & ทำอาหารริมน้ำ (6 ฉาก)',
     aspect: '16:9',
     text: `คลิปเชิญชวนตกปลาวันหยุดพักผ่อนริมน้ำ
 1. ชวนกันไปซื้ออุปกรณ์ตกปลาในร้านโปรด
@@ -73,26 +76,24 @@ Scene 8: เปิดระบบ EV (Boot-up Screen)
 Prompt: Macro shot. A glowing, futuristic digital dashboard instrument cluster in a modern electric vehicle waking up. Dark elegant cabin, high contrast, cinematic lighting, modern technology concept.`
   },
   {
-    id: 'glass_skin',
-    badge: '✨ โฆษณาเซรั่ม Glass Skin',
+    id: 'tiktok_viral_3',
+    badge: '🔥 ไวรัล 3 ช็อต Hook-Story-CTA',
     aspect: '9:16',
-    text: `โฆษณาเซรั่มบำรุงผิวหน้า Glass Skin พรีเมียม
-1. ขวดเซรั่มแก้วใสวางบนผิวน้ำที่มีคลื่นเบาๆ แสงแดดเช้าส่องประกายระยิบระยับ
-2. ดรอปเปอร์หยดเนื้อเซรั่มใสเข้มข้นลงบนหลังมือ ภาพมาโครเห็นความชุ่มชื้นชัดเจน
-3. นางแบบสาวผิวใสเกลี่ยเนื้อเซรั่มลงบนแก้มอย่างนุ่มนวล แสงธรรมชาติอบอุ่น
-4. ภาพโคลสอัพผิวหน้าที่ดูฉ่ำวาว อิ่มน้ำ สุขภาพดีหลังทาเสร็จ
-5. นางแบบยิ้มมั่นใจหน้ากระจกในห้องแต่งตัวมินิมอลแสงคลีน
-6. ช็อตจบสินค้าขวดเซรั่มคู่กับหยดน้ำและดอกไม้สีขาว พร้อมพื้นที่วางโลโก้แบรนด์`
+    text: `คลิปสั้นไวรัล รีวิวคาเฟ่ลับสไตล์เกียวโต
+1. เปิดด้วยช็อตผลักประตูไม้โบราณเจอน้ำตกและสวนญี่ปุ่นร่มรื่นกลางกรุง
+2. ช็อตตักเค้กมัทฉะลาวาเยิ้มๆ ป้อนใส่กล้อง Extreme Close-Up น่ากินสุดๆ
+3. ยกแก้วกาแฟชนกล้อง ยิ้มชวนปักหมุดตามมาลองกันวันหยุดนี้`
   },
   {
-    id: 'tiktok_viral',
-    badge: '🔥 คลิปสั้นไวรัล TikTok',
+    id: 'glass_skin',
+    badge: '✨ โฆษณาเซรั่ม Glass Skin (5 ฉาก)',
     aspect: '9:16',
-    text: `คลิปสั้นไวรัล รีวิวคาเฟ่ลับเปิดใหม่สไตล์ญี่ปุ่นในกรุงเทพฯ
-1. เปิดด้วยช็อตเดินผลักประตูไม้โบราณเข้าไปเจอสวนญี่ปุ่นสีเขียวร่มรื่นกลางกรุง
-2. บาริสต้ากำลังตีมัทฉะเกรดพรีเมียมในถ้วยเซรามิกทำมือและเทลงบนนมสดแยกชั้นสวยงาม
-3. ช็อตตักเค้กมัทฉะลาวาเยิ้มๆ น่ากินแบบ Extreme Close-up
-4. ลูกค้านั่งจิบกาแฟริมหน้าต่างไม้กระจกกลม แสงแดดบ่ายส่องอบอุ่น บรรยากาศเหมือนอยู่เกียวโต`
+    text: `โฆษณาเซรั่มบำรุงผิวหน้า Glass Skin พรีเมียม
+1. ขวดเซรั่มแก้วใสวางบนผิวน้ำกระทบแสงแดดเช้า มีหยดน้ำระยิบระยับ
+2. ดรอปเปอร์หยดเนื้อเซรั่มใสเข้มข้นลงบนหลังมือ มาโครเห็นความชุ่มชื้นชัดเจน
+3. นางแบบสาวผิวใสเกลี่ยเนื้อเซรั่มลงบนแก้มอย่างนุ่มนวล แสงธรรมชาติอบอุ่น
+4. ซูมผิวหน้าที่ดูฉ่ำวาว อิ่มน้ำ สุขภาพดีไร้ที่ติ
+5. ช็อตจบสินค้าคู่กับดอกไม้สีขาว พร้อมรอยยิ้มมั่นใจของนางแบบ`
   }
 ];
 
@@ -187,6 +188,29 @@ function extractScriptBeats(text) {
   return [];
 }
 
+// Detect if user prompt explicitly requests a shot count (e.g. "ขอ 3 ฉาก", "10 ช็อต", "4 scenes")
+function detectShotCountFromText(text) {
+  if (!text) return null;
+  const match = text.match(/(?:ขอ|เอา|อยากได้|สร้าง|ทำ|จำนวน)?\s*(\d+)\s*(?:ฉาก|ช็อต|ซีน|ช้อต|ตอน|shots?|scenes?|cuts?)/i);
+  if (match) {
+    const num = parseInt(match[1], 10);
+    if (num >= 2 && num <= 16) return num;
+  }
+  return null;
+}
+
+// Helper to pick evenly distributed beats from any size pool
+function pickBeats(pool, count) {
+  if (count <= 1) return [pool[0]];
+  if (count >= pool.length) return pool.slice(0, count);
+  const result = [];
+  for (let i = 0; i < count; i++) {
+    const idx = Math.round((i * (pool.length - 1)) / (count - 1));
+    result.push(pool[idx]);
+  }
+  return result;
+}
+
 export default function BriefView({
   onPlanAndAutoRender,
   onPlanForReview,
@@ -199,24 +223,51 @@ export default function BriefView({
   const [errorMsg, setErrorMsg] = useState('');
   const [pasteSuccess, setPasteSuccess] = useState(false);
 
+  // Scene count control: 'auto' or a number (2..16)
+  const [selectedShotCount, setSelectedShotCount] = useState('auto');
+
   // Co-Director Assistant State
   const [coDirectorOpen, setCoDirectorOpen] = useState(false);
   const [selectedMood, setSelectedMood] = useState(CO_DIRECTOR_QUESTIONS.moods[0].id);
   const [selectedLocation, setSelectedLocation] = useState(CO_DIRECTOR_QUESTIONS.locations[0].id);
   const [selectedEnding, setSelectedEnding] = useState(CO_DIRECTOR_QUESTIONS.endings[0].id);
 
-  // Auto-detect beats and scene count
+  // Auto-detect beats from script text
   const detectedBeats = useMemo(() => {
     return extractScriptBeats(storyConcept);
   }, [storyConcept]);
 
-  const detectedScenesCount = useMemo(() => {
-    if (!storyConcept.trim()) return 0;
+  // Analyze the prompt text for explicit counts or style hints
+  const textMentionedCount = useMemo(() => {
+    return detectShotCountFromText(storyConcept);
+  }, [storyConcept]);
+
+  // Calculate the intelligent default count when in 'auto' mode
+  const autoInferredCount = useMemo(() => {
     if (detectedBeats.length >= 2) {
       return detectedBeats.length;
     }
-    return 6; // Smart AI default narrative arc for short briefs
-  }, [storyConcept, detectedBeats]);
+    if (textMentionedCount) {
+      return textMentionedCount;
+    }
+    const t = storyConcept.toLowerCase();
+    if (/(?:คลิปสั้น|tiktok|reels|shorts|สั้นๆ|ไวรัล)/.test(t)) {
+      return 4;
+    }
+    if (/(?:asmr|macro|เจาะลึก|สารคดี|series|ซีรีส์)/.test(t)) {
+      return 8;
+    }
+    return 6; // Standard cinematic commercial arc
+  }, [storyConcept, detectedBeats, textMentionedCount]);
+
+  // The actual effective scene count that will be used
+  const effectiveScenesCount = useMemo(() => {
+    if (!storyConcept.trim()) return 0;
+    if (selectedShotCount === 'auto') {
+      return autoInferredCount;
+    }
+    return Math.max(2, Math.min(16, Number(selectedShotCount) || 6));
+  }, [storyConcept, selectedShotCount, autoInferredCount]);
 
   const handlePasteFromClipboard = async () => {
     try {
@@ -224,6 +275,7 @@ export default function BriefView({
       if (clipText && clipText.trim()) {
         setStoryConcept(clipText.trim());
         setErrorMsg('');
+        setSelectedShotCount('auto');
         setPasteSuccess(true);
         setTimeout(() => setPasteSuccess(false), 1800);
       }
@@ -236,10 +288,18 @@ export default function BriefView({
     setStoryConcept(preset.text);
     setAspectRatio(preset.aspect);
     setVisualStyle('auto');
+    setSelectedShotCount('auto');
     setErrorMsg('');
   };
 
-  // Co-Director synthesizer: Build a rich 6-beat script from user's topic + chosen options
+  // Adjust count via stepper buttons [-] [+]
+  const handleStepCount = (delta) => {
+    const current = effectiveScenesCount;
+    const nextVal = Math.max(2, Math.min(16, current + delta));
+    setSelectedShotCount(nextVal);
+  };
+
+  // Co-Director synthesizer: Build a rich N-beat script from user's topic + chosen options & shot count
   const handleSynthesizeCoDirectorPlan = () => {
     const raw = storyConcept.replace(/^[🎬🎥✨🚗🎧📱#\s*\d.)\-]+/, '').split('\n')[0].trim();
     const topic = raw && raw.length > 2 && raw.length < 80 ? raw : 'คลิปเชิญชวนไปเที่ยวและตกปลาวันหยุด';
@@ -248,27 +308,42 @@ export default function BriefView({
     const locObj = CO_DIRECTOR_QUESTIONS.locations.find((l) => l.id === selectedLocation) || CO_DIRECTOR_QUESTIONS.locations[0];
     const endObj = CO_DIRECTOR_QUESTIONS.endings.find((e) => e.id === selectedEnding) || CO_DIRECTOR_QUESTIONS.endings[0];
 
-    // Check domain
+    const targetN = effectiveScenesCount;
     const isFish = /ตกปลา|ปลา|angling|fish/i.test(topic);
 
-    let scriptText = '';
+    let scriptBeats = [];
     if (isFish) {
-      scriptText = `${topic} (${moodObj.label} ณ ${locObj.label})
-1. ชวนเพื่อนแวะร้านอุปกรณ์ตกปลา เลือกคันเบ็ดและเหยื่อตัวเด็ด
-2. เดินทางถึงหมายตกปลา แสงอาทิตย์ยามเช้าสะท้อนผิวน้ำ มีหมอกบางๆ
-3. ลงเรือพายออกไปกลางน้ำ หวดคันเบ็ดทอดสายลงสู่ผิวน้ำนิ่ง
-4. คันเบ็ดโค้งงอ สายเบ็ดดึงตึง แอคชั่นดึงสู้ปลาตัวใหญ่ขึ้นมาได้สำเร็จ
-5. นำปลาที่ตกได้สดๆ มาทำอาหาร ก่อเตาถ่านย่างปลาหอมกรุ่นริมแคมป์
-6. ${endObj.label.replace(/^[\uD800-\uDBFF\uDC00-\uDFFF\s]+/, '')} ท่ามกลางบรรยากาศแสนอบอุ่น`;
+      const fishPool = [
+        'ชวนเพื่อนแวะร้านจำหน่ายอุปกรณ์ตกปลาขนาดใหญ่ เตรียมความพร้อมและวางแผนเดินทาง',
+        'หยิบคันเบ็ดคาร์บอนไฟเบอร์น้ำหนักเบาและรอกตกปลาโลหะขึ้นมาทดสอบความยืดหยุ่นในร้าน',
+        'ออกเดินทางถึงริมน้ำ แสงเช้าสาดส่องผิวน้ำนิ่ง มีหมอกบางๆ ลอยละล่อง',
+        'ล่องเรือหางยาวออกสู่ผืนน้ำกว้างใหญ่ สัมผัสสายลมและธรรมชาติบริสุทธิ์',
+        'หวดคันเบ็ดทอดสายลงสู่ผืนน้ำนิ่งอย่างมีสมาธิ รอคอยจังหวะอย่างใจเย็น',
+        'สายเบ็ดกระตุกแรง คันเบ็ดโค้งงออย่างรุนแรง ปลาตัวโตดิ้นกระโดดสาดละอองน้ำระยิบระยับ',
+        'ออกแรงหมุนรอกงัดสู้ปลาอย่างตื่นเต้น และยกปลาตัวโตขึ้นมาบนเรือด้วยรอยยิ้มภาคภูมิใจ',
+        'นำปลาสดจากน้ำมาก่อเตาถ่านแคมป์ปิ้งริมน้ำ ควันหอมฉุยลอยกรุ่น',
+        'ย่างปลาสดจนสุกเกรียมเหลืองทอง โรยเกลือสมุนไพร กลิ่นหอมน่ารับประทาน',
+        `${endObj.label.replace(/^[\uD800-\uDBFF\uDC00-\uDFFF\s]+/, '')} ท่ามกลางบรรยากาศแสนอบอุ่น`
+      ];
+      scriptBeats = pickBeats(fishPool, targetN);
     } else {
-      scriptText = `${topic} (${moodObj.label} ณ ${locObj.label})
-1. เปิดฉากแนะนำสถานที่และบรรยากาศโดยรอบ แสงธรรมชาติสวยงาม
-2. ตัวละครหลักเริ่มลงมือเตรียมพร้อมและเลือกอุปกรณ์ชิ้นสำคัญ
-3. ก้าวเข้าสู่ช่วงเวลาสำคัญของการเดินทางและสัมผัสประสบการณ์ตรง
-4. ช่วงเวลาไคลแม็กซ์ที่น่าตื่นเต้น ประสบความสำเร็จตามเป้าหมาย
-5. บันทึกรายละเอียดความประทับใจและรอยยิ้มแห่งความภาคภูมิใจ
-6. ${endObj.label.replace(/^[\uD800-\uDBFF\uDC00-\uDFFF\s]+/, '')} ปิดท้ายเรื่องราวอย่างน่าประทับใจ`;
+      const generalPool = [
+        'เปิดฉากแนะนำสถานที่และบรรยากาศโดยรอบ แสงธรรมชาติสวยงาม',
+        'ตัวละครหลักเริ่มลงมือเตรียมพร้อมและเลือกอุปกรณ์ชิ้นสำคัญ',
+        'ออกเดินทางสู่สถานที่สำคัญ สัมผัสบรรยากาศแห่งความตื่นเต้น',
+        'เริ่มต้นลงมือทำขั้นตอนสำคัญด้วยความตั้งใจและมุ่งมั่น',
+        'เจาะลึกรายละเอียดความใส่ใจและการพัฒนาอย่างต่อเนื่อง',
+        'ช่วงเวลาไคลแม็กซ์ที่น่าตื่นเต้นที่สุด ประสบความสำเร็จตามเป้าหมาย',
+        'ช็อตบันทึกรอยยิ้ม ความสุข และความภาคภูมิใจในผลงาน',
+        'แบ่งปันช่วงเวลาดีๆ ร่วมกับเพื่อนและผู้คนรอบข้าง',
+        'มุมมองศิลปะและรายละเอียดอันประณีตสร้างความประทับใจ',
+        `${endObj.label.replace(/^[\uD800-\uDBFF\uDC00-\uDFFF\s]+/, '')} ปิดท้ายเรื่องราวอย่างน่าประทับใจ`
+      ];
+      scriptBeats = pickBeats(generalPool, targetN);
     }
+
+    const scriptText = `${topic} (${moodObj.label} ณ ${locObj.label})\n` +
+      scriptBeats.map((b, i) => `${i + 1}. ${b}`).join('\n');
 
     setStoryConcept(scriptText);
     setErrorMsg('');
@@ -283,8 +358,8 @@ export default function BriefView({
     setErrorMsg('');
     const payload = {
       story_concept: storyConcept.trim(),
-      num_shots: detectedScenesCount,
-      target_duration: detectedScenesCount * 3,
+      num_shots: effectiveScenesCount,
+      target_duration: effectiveScenesCount * 3,
       pacing: 'normal',
       visual_style: visualStyle.trim() || 'auto',
       camera_breakdown: cameraBreakdown,
@@ -309,13 +384,13 @@ export default function BriefView({
               <span>ผู้กำกับสตอรี่บอร์ด AI</span>
             </h2>
             <p className="text-[11px] text-slate-400 mt-0.5">
-              พิมพ์สั้นๆ หรือวางบรีฟ ระบบจะแตกช็อตและจัดมุมกล้องให้อัตโนมัติ
+              พิมพ์สั้นหรือยาว ระบบจะวิเคราะห์ฉากและจัดมุมกล้องให้อัตโนมัติ
             </p>
           </div>
           {storyConcept.trim() && (
             <span className="px-2.5 py-1 rounded-lg bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-[11px] font-bold flex items-center gap-1 shrink-0">
               <CheckCircle2 className="w-3.5 h-3.5" />
-              <span>{detectedScenesCount} ช็อต</span>
+              <span>{effectiveScenesCount} ช็อต</span>
             </span>
           )}
         </div>
@@ -372,7 +447,7 @@ export default function BriefView({
             value={storyConcept}
             onChange={(e) => setStoryConcept(e.target.value)}
             rows={6}
-            placeholder="พิมพ์หรือวางเนื้อเรื่องที่นี่ได้เลยครับ รองรับทั้งข้อความสั้นๆ เช่น 'คลิปชวนตกปลา', ข้อความแบบ 1..6, หรือ Scene 1..N..."
+            placeholder="พิมพ์หรือวางเนื้อเรื่องที่นี่ได้เลยครับ รองรับทั้งข้อความสั้นๆ เช่น 'คลิปชวนตกปลา 3 ฉาก', 'รีวิวเซรั่ม 10 ช็อต', หรือบท Scene 1..N..."
             className="w-full p-3.5 rounded-xl bg-[#0B0D11] border border-slate-800 focus:border-amber-500/70 focus:outline-none text-xs text-slate-100 placeholder:text-slate-600 leading-relaxed resize-y font-sans"
           />
 
@@ -382,7 +457,7 @@ export default function BriefView({
               <div className="flex items-center justify-between text-emerald-400 font-bold mb-1.5">
                 <span className="flex items-center gap-1.5 text-[11px]">
                   <CheckCircle2 className="w-3.5 h-3.5" />
-                  <span>ตรวจพบโครงเรื่อง {detectedBeats.length} ฉากต่อเนื่อง:</span>
+                  <span>ตรวจพบโครงเรื่อง {detectedBeats.length} ฉากจากบทของคุณ:</span>
                 </span>
                 <span className="text-[10px] text-slate-400 font-normal">ระบบจะสร้างมุมกล้องให้ครบทุกช็อต</span>
               </div>
@@ -399,21 +474,107 @@ export default function BriefView({
                 ))}
               </div>
             </div>
+          ) : textMentionedCount ? (
+            <div className="p-2 rounded-xl bg-emerald-500/10 border border-emerald-500/25 text-[11px] text-emerald-300 flex items-center justify-between gap-2">
+              <span className="flex items-center gap-1.5">
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                <span>AI ตรวจพบคำขอ: สร้าง {textMentionedCount} ฉากตามข้อความของคุณ</span>
+              </span>
+            </div>
           ) : storyConcept.trim() ? (
             <div className="p-2 rounded-xl bg-amber-500/10 border border-amber-500/20 text-[11px] text-amber-200/90 flex items-center justify-between gap-2">
               <span className="flex items-center gap-1.5">
                 <Lightbulb className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-                <span>ข้อความสั้น: AI จะสังเคราะห์เป็น 6 ช็อตโปรดักชันให้อัตโนมัติ</span>
+                <span>AI วิเคราะห์ความเหมาะสม ({effectiveScenesCount} ฉาก) หรือเลือกปรับจำนวนฉากด้านล่างได้อิสระ</span>
               </span>
-              <button
-                type="button"
-                onClick={() => setCoDirectorOpen(true)}
-                className="text-[10px] font-bold text-amber-300 underline hover:text-amber-200 shrink-0 cursor-pointer"
-              >
-                เลือกสไตล์เพิ่ม
-              </button>
             </div>
           ) : null}
+        </div>
+
+        {/* Dynamic Scene Count Selector (แก้ปัญหาการล็อค 6 ฉาก ให้เลือก 2, 3, 4, 5, 8, 10 ได้อิสระ) */}
+        <div className="p-3 rounded-xl bg-[#141824] border border-slate-800 space-y-2">
+          <div className="flex items-center justify-between gap-2">
+            <label className="text-[11px] font-bold text-slate-200 flex items-center gap-1.5">
+              <Sliders className="w-3.5 h-3.5 text-amber-400" />
+              <span>จำนวนช็อต / ฉากที่ต้องการสร้าง</span>
+            </label>
+            <div className="flex items-center gap-1 text-[11px] font-bold text-amber-400">
+              {selectedShotCount === 'auto' ? (
+                <span className="text-emerald-400 font-semibold text-[10px]">✨ วิเคราะห์อัตโนมัติ</span>
+              ) : (
+                <span className="text-amber-400 font-semibold text-[10px]">กำหนดเอง</span>
+              )}
+            </div>
+          </div>
+
+          {/* Stepper + Quick Pills */}
+          <div className="flex items-center gap-2">
+            {/* Stepper [-] count [+] */}
+            <div className="flex items-center rounded-lg bg-[#0B0D11] border border-slate-700 p-0.5 shrink-0">
+              <button
+                type="button"
+                onClick={() => handleStepCount(-1)}
+                disabled={effectiveScenesCount <= 2}
+                title="ลดจำนวนฉาก"
+                className="w-7 h-7 flex items-center justify-center rounded-md text-slate-300 hover:text-white hover:bg-slate-800 disabled:opacity-30 transition-colors cursor-pointer"
+              >
+                <Minus className="w-3.5 h-3.5" />
+              </button>
+              <div className="px-3 min-w-[58px] text-center font-extrabold text-xs text-amber-300">
+                {effectiveScenesCount} ฉาก
+              </div>
+              <button
+                type="button"
+                onClick={() => handleStepCount(1)}
+                disabled={effectiveScenesCount >= 16}
+                title="เพิ่มจำนวนฉาก"
+                className="w-7 h-7 flex items-center justify-center rounded-md text-slate-300 hover:text-white hover:bg-slate-800 disabled:opacity-30 transition-colors cursor-pointer"
+              >
+                <Plus className="w-3.5 h-3.5" />
+              </button>
+            </div>
+
+            {/* Quick Scene Count Pills */}
+            <div className="flex flex-wrap items-center gap-1 flex-1">
+              <button
+                type="button"
+                onClick={() => setSelectedShotCount('auto')}
+                className={`px-2 py-1 rounded-lg text-[10px] font-bold border transition-all cursor-pointer ${
+                  selectedShotCount === 'auto'
+                    ? 'bg-emerald-500 text-slate-950 border-emerald-400'
+                    : 'bg-[#171C28] text-slate-300 border-slate-700/80 hover:border-slate-500'
+                }`}
+              >
+                ✨ ออโต้ ({autoInferredCount})
+              </button>
+              {[2, 3, 4, 5, 6, 8, 10].map((num) => {
+                const active = selectedShotCount === num || (selectedShotCount === 'auto' && effectiveScenesCount === num);
+                return (
+                  <button
+                    key={num}
+                    type="button"
+                    onClick={() => setSelectedShotCount(num)}
+                    className={`px-2 py-1 rounded-lg text-[10px] font-bold border transition-all cursor-pointer ${
+                      selectedShotCount === num
+                        ? 'bg-amber-500 text-slate-950 border-amber-400'
+                        : active
+                        ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
+                        : 'bg-[#171C28] text-slate-300 border-slate-700/80 hover:border-slate-500'
+                    }`}
+                  >
+                    {num}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+          <p className="text-[10px] text-slate-400">
+            {detectedBeats.length >= 2
+              ? `ตรวจพบ ${detectedBeats.length} ฉากจากบทของคุณ หรือคลิกเลือกตัวเลขด้านบนเพื่อสร้างฉากตามต้องการ`
+              : textMentionedCount
+              ? `AI ตรวจพบความต้องการสร้าง ${textMentionedCount} ฉากจากข้อความที่พิมพ์`
+              : `สามารถเลือกได้ตั้งแต่ 2 ฉาก (แบบกระชับ) จนถึง 10-12 ฉาก (แบบเต็มเรื่องราว)`}
+          </p>
         </div>
 
         {/* Co-Director Assistant (ถามเพิ่มเติม / ขยายไอเดีย) */}
@@ -429,11 +590,11 @@ export default function BriefView({
               </div>
               <div>
                 <span className="text-xs font-bold text-white flex items-center gap-1.5">
-                  <span>ผู้ช่วยผู้กำกับ AI (ถามเพิ่มเติม / ขยายไอเดีย)</span>
+                  <span>ผู้ช่วยผู้กำกับ AI (ถามเพิ่มเติม / ช่วยเขียนบท)</span>
                   <span className="px-1.5 py-0.2 rounded text-[9px] bg-amber-500 text-slate-950 font-black">ฉลาดขึ้น</span>
                 </span>
                 <p className="text-[10px] text-slate-400">
-                  เลือกแนวทาง 3 ข้อง่ายๆ เพื่อให้ AI ช่วยเขียนบท 6 ฉากที่ตรงใจคุณที่สุด
+                  เลือกแนวทาง 3 ข้อง่ายๆ เพื่อให้ AI ช่วยเขียนบท {effectiveScenesCount} ฉากที่ตรงใจคุณที่สุด
                 </p>
               </div>
             </div>
@@ -532,7 +693,7 @@ export default function BriefView({
                   className="w-full py-2 px-3 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-md shadow-emerald-900/30 transition-all cursor-pointer"
                 >
                   <Sparkles className="w-3.5 h-3.5" />
-                  <span>✨ นำคำตอบไปสังเคราะห์เป็นบท 6 ฉากให้อัตโนมัติ</span>
+                  <span>✨ นำคำตอบไปสังเคราะห์เป็นบท {effectiveScenesCount} ฉากให้อัตโนมัติ</span>
                 </button>
               </div>
             </div>
@@ -652,7 +813,7 @@ export default function BriefView({
             ) : (
               <>
                 <Sparkles className="w-4 h-4 stroke-[2.5]" />
-                <span>สร้างสตอรี่บอร์ด + วาดภาพ AI ทันที ({detectedScenesCount} ช็อต)</span>
+                <span>สร้างสตอรี่บอร์ด + วาดภาพ AI ทันที ({effectiveScenesCount} ช็อต)</span>
               </>
             )}
           </button>
