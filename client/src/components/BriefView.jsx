@@ -111,16 +111,16 @@ const CAMERA_BREAKDOWN_MODES = [
     label: '🎬 แบ่งอัตโนมัติตามเนื้อเรื่อง + ครบทุกมุมกล้อง (กว้าง → กลาง → ใกล้ → จบ)'
   },
   {
+    id: 'dynamic_angles',
+    label: '⚡ คลิปสั้นหลายฉาก ตัดสลับไว (Fast-Paced Montage / 6-10 Shots) - มุมกล้องหลากหลาย ไดนามิกสูง'
+  },
+  {
     id: 'macro_detail',
     label: '🔍 เน้นเจาะดีเทลสินค้า & มุมใกล้พิเศษ (Macro & Close-Up Focus)'
   },
   {
     id: 'cinematic_story',
     label: '🌟 เน้นเล่าเรื่องอารมณ์ตัวละคร & บรรยากาศภาพยนตร์'
-  },
-  {
-    id: 'dynamic_angles',
-    label: '⚡ มุมกล้องหลากหลาย ตัดสลับไวสำหรับคลิปสั้น (POV / มุมเสย / โคลสอัพ)'
   }
 ];
 
@@ -250,14 +250,18 @@ export default function BriefView({
     if (textMentionedCount) {
       return textMentionedCount;
     }
-    const t = storyConcept.toLowerCase();
-    if (/(?:คลิปสั้น|tiktok|reels|shorts|สั้นๆ|ไวรัล)/.test(t)) {
-      return 4;
+    // Content-aware beat analysis from narrative clauses
+    const narrativeClauses = storyConcept
+      .split(/(?:,|\n|\t|->|➔|=>|จากนั้น|ต่อด้วย|แล้วค่อย|แล้ว|ก่อนจะ|ก่อนที่|จบด้วย|ปิดท้ายด้วย)/)
+      .filter((p) => p.trim().length >= 3);
+    if (narrativeClauses.length >= 3) {
+      return Math.min(12, narrativeClauses.length);
     }
+    const t = storyConcept.toLowerCase();
     if (/(?:asmr|macro|เจาะลึก|สารคดี|series|ซีรีส์)/.test(t)) {
       return 8;
     }
-    return 6; // Standard cinematic commercial arc
+    return 6; // Standard rich cinematic multi-shot default
   }, [storyConcept, detectedBeats, textMentionedCount]);
 
   // The actual effective scene count that will be used
@@ -570,10 +574,10 @@ export default function BriefView({
           </div>
           <p className="text-[10px] text-slate-400">
             {detectedBeats.length >= 2
-              ? `ตรวจพบ ${detectedBeats.length} ฉากจากบทของคุณ หรือคลิกเลือกตัวเลขด้านบนเพื่อสร้างฉากตามต้องการ`
+              ? `ตรวจพบ ${detectedBeats.length} ฉากจากบทของคุณ (สามารถกดเพิ่ม/ลดจำนวนช็อตได้ตามต้องการ)`
               : textMentionedCount
-              ? `AI ตรวจพบความต้องการสร้าง ${textMentionedCount} ฉากจากข้อความที่พิมพ์`
-              : `สามารถเลือกได้ตั้งแต่ 2 ฉาก (แบบกระชับ) จนถึง 10-12 ฉาก (แบบเต็มเรื่องราว)`}
+              ? `AI ตรวจพบคำขอ: สร้าง ${textMentionedCount} ฉากตามข้อความของคุณ`
+              : `คลิปสั้นและคอนเทนต์ทุกประเภทสามารถมีหลายฉาก (6-10 ฉากขึ้นไป) เพื่อเพิ่มความน่าสนใจและมุมกล้องที่สวยงามได้อิสระครับ`}
           </p>
         </div>
 

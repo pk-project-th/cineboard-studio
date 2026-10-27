@@ -467,8 +467,8 @@ async function generateSmartNeuralStoryboard(
   // 2. Intelligent Target Shot Count Analysis:
   // Priority: (a) Explicit text in prompt ("ขอ 3 ฉาก", "10 ช็อต", "4 scenes")
   //           (b) Requested count from client UI (requestedCount)
-  //           (c) Domain / format keywords (TikTok/Reels -> 4, ASMR/Deep -> 8)
-  //           (d) Default standard -> 6
+  //           (c) Narrative actions / clauses directly in user's content
+  //           (d) Default rich cinematic arc (6 to 8 shots) without arbitrary restrictions
   let targetCount = 0;
   const countMatch = rawText.match(/(?:ขอ|เอา|อยากได้|สร้าง|ทำ|จำนวน)?\s*(\d+)\s*(?:ฉาก|ช็อต|ซีน|ช้อต|ตอน|shots?|scenes?|cuts?)/i);
   if (countMatch) {
@@ -476,12 +476,14 @@ async function generateSmartNeuralStoryboard(
   } else if (requestedCount && Number(requestedCount) >= 2) {
     targetCount = parseInt(requestedCount, 10);
   } else {
-    if (/(?:คลิปสั้น|tiktok|reels|shorts|สั้นๆ|ไวรัล)/i.test(rawText)) {
-      targetCount = 4;
+    // Analyze narrative action clauses directly from content
+    const narrativeClauses = rawText.split(/(?:,|\n|\t|->|➔|=>|จากนั้น|ต่อด้วย|แล้วค่อย|แล้ว|ก่อนจะ|ก่อนที่|จบด้วย|ปิดท้ายด้วย)/).filter(p => p.trim().length >= 3);
+    if (narrativeClauses.length >= 3) {
+      targetCount = narrativeClauses.length;
     } else if (/(?:asmr|macro|เจาะลึก|สารคดี|series|ซีรีส์)/i.test(rawText)) {
       targetCount = 8;
     } else {
-      targetCount = 6;
+      targetCount = 6; // Standard rich multi-angle cinematic default
     }
   }
 
