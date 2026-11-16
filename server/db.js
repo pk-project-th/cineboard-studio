@@ -92,6 +92,8 @@ const promptMigrations = [
   `ALTER TABLE prompts ADD COLUMN scene_title TEXT;`,
   `ALTER TABLE prompts ADD COLUMN duration_seconds REAL DEFAULT 2.5;`,
   `ALTER TABLE prompts ADD COLUMN timecode TEXT;`,
+  `ALTER TABLE prompts ADD COLUMN shot_role TEXT;`,
+  `ALTER TABLE prompts ADD COLUMN is_completed INTEGER DEFAULT 0;`,
   `ALTER TABLE series ADD COLUMN target_duration REAL DEFAULT 30.0;`,
   `ALTER TABLE series ADD COLUMN pacing TEXT DEFAULT 'fast';`
 ];

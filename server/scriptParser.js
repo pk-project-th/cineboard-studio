@@ -1,295 +1,587 @@
 /**
- * Universal Multi-Scene Script Parser & Storyboard Director Engine
- * Parses freeform, structured, inline numbered, or arrow-separated multi-scene scripts.
- * Enriches every shot with professional directorial actions, camera grammar, audio foley,
- * natural Thai voiceover, and high-fidelity English prompts for FLUX.1.
- * Fully offline, zero Groq dependency!
+ * CineBoard Studio — On-the-Go Content & Travel Storyboard Director Engine
+ * Turns any quick travel/content idea or multi-scene script into a connected,
+ * practical shooting guide with:
+ *   1. Scene Role & Duration (กี่ฉาก ฉากละกี่วิ)
+ *   2. Exact Shooting Action (ถ่ายอะไรบ้าง)
+ *   3. Camera Angle & Phone Lens Guide (มุมกล้องไหน ถือกล้องยังไง)
+ *   4. On-Screen Text & Safe-Zone Framing (ต้องเว้นใส่ข้อความอะไรมั้ย)
+ *   5. Connected Thai Voiceover Script & Tone (เสียงพากย์จะเป็นประมาณไหน)
  */
 
-function escapeXml(unsafe) {
-  if (!unsafe) return '';
-  return String(unsafe)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&apos;');
-}
-
-/**
- * Normalizes user input: handles inline numbers (1. ... 2. ...), arrow steps (->),
- * and standard Scene/Shot headers.
- */
 function normalizeScriptText(rawText) {
   if (!rawText) return '';
   let text = String(rawText).replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim();
 
-  // 1. Convert arrow steps 'A -> B -> C' or 'A => B => C' into numbered lines if detected
-  if (/(?:->|→|=>)/.test(text) && !/(?:Scene|Shot|ฉากที่|\d+\.)/i.test(text)) {
-    const parts = text.split(/(?:->|→|=>)/).map(p => p.trim()).filter(Boolean);
+  // 1. Convert arrow steps 'A -> B -> C' into numbered lines
+  if (/(?:->|→|=>|➔)/.test(text) && !/(?:Scene|Shot|ฉากที่|\d+\.)/i.test(text)) {
+    const parts = text.split(/(?:->|→|=>|➔)/).map(p => p.trim()).filter(Boolean);
     if (parts.length >= 2) {
       text = parts.map((p, i) => `${i + 1}. ${p}`).join('\n');
     }
   }
 
-  // 2. Insert double newline before inline numbered steps e.g. "Title 1. Step A 2. Step B 3. Step C"
+  // 2. Insert double newline before inline numbered steps e.g. "Title 1. Step A 2. Step B"
   text = text.replace(/(?:^|\s+|[^\d])(?:(\d+)[\.\)]\s*|(?:ฉากที่|ช็อตที่|ซีนที่|Scene|Shot)\s*(\d+)[:\s.-]*)/gi, (match, n1, n2, offset) => {
     const num = n1 || n2;
     return (offset > 0 ? '\n\n' : '') + 'Scene ' + num + ': ';
   });
 
-  // 3. Insert newline before Prompt:
+  // 3. Insert newline before Prompt:, Visual Style:, Audio:, Dialogue:
   text = text.replace(/([^\n])\s*(Prompt\s*[:：])/gi, '$1\n$2');
-
-  // 4. Insert newline before Visual Style Reference / Visual Style:
   text = text.replace(/([^\n])\s*(Visual\s*Style(?:[^\n:：]*?)?[:：])/gi, '$1\n$2');
-
-  // 5. Insert newline before Audio / Foley / Sound / Dialogue
   text = text.replace(/([^\n])\s*((?:Audio|Foley|Sound|เสียง|ซาวด์|Dialogue|บทพูด|เสียงพากย์)\s*[:：])/gi, '$1\n$2');
 
   return text;
 }
 
 /**
- * Analyze domain and generate rich, professional directorial details for any beat
+ * Determine the Narrative Role of a shot based on its position in the video
  */
-function enrichSingleBeat(projectTitle, beatText, index, totalShots, visualStyleEn) {
-  const combined = (projectTitle + ' ' + beatText).toLowerCase();
+function getShotNarrativeRole(index, totalShots) {
+  if (index === 0) {
+    return {
+      role: '🎯 HOOK เปิดคลิปหยุดนิ้ว',
+      defaultDuration: 2.5,
+      textSafeZone: '📐 เว้นพื้นที่ว่างด้านบน 30% (ช่วงท้องฟ้าหรือเพดาน) สำหรับวางพาดหัว Hook ขนาดใหญ่ไม่ให้บังตัวแบบ'
+    };
+  }
+  if (index === totalShots - 1) {
+    return {
+      role: '📌 สรุปจบ & ชวนปักหมุด (CTA)',
+      defaultDuration: 3.0,
+      textSafeZone: '📐 จัดตัวแบบไว้ตรงกลางค่อนบน เว้นพื้นที่ด้านล่าง 25% สำหรับใส่ป้ายสรุปพิกัด/ชวนกดเซฟคลิป'
+    };
+  }
+  if (index === 1) {
+    return {
+      role: '🚶 พาเข้าสู่บรรยากาศจริง',
+      defaultDuration: 3.0,
+      textSafeZone: '📐 จัดจุดเด่นไว้ตามแนวเส้นตัด 9 ช่อง เว้นขอบซ้ายหรือมุมบนใส่ข้อความบอกชื่อสถานที่'
+    };
+  }
+  if (index === totalShots - 2 && totalShots >= 4) {
+    return {
+      role: '😍 โมเมนต์ความสุข & มุมถ่ายรูปปัง',
+      defaultDuration: 3.0,
+      textSafeZone: '📐 เน้นใบหน้าและรอยยิ้มชัดๆ เว้นพื้นที่มุมล่างขวาใส่แคปชั่นความรู้สึกสั้นๆ'
+    };
+  }
+  return {
+    role: `✨ ไฮไลท์จุดเด็ด (ช่วงที่ ${index})`,
+    defaultDuration: 3.0,
+    textSafeZone: '📐 โฟกัสจุดเด่นกลางภาพ เว้นพื้นที่ด้านบนหรือด้านล่าง 20% สำหรับใส่ข้อความบรรยายจุดเด่น'
+  };
+}
 
-  // Determine domain
-  const isFishing = /ตกปลา|ปลา|คันเบ็ด|รอก|เหยื่อ|บ่อปลา|แม่น้ำ|อ่างเก็บน้ำ|fish|angling/.test(combined);
-  const isCar = /รถ|โชว์รูม|ส่งมอบ|ขับขี่|กุญแจ|พวงมาลัย|กระจังหน้า|mazda|ev|car|suv|handover/.test(combined);
-  const isSkincare = /เซรั่ม|ผิว|ครีม|ดรอปเปอร์|แต่งหน้า|สกินแคร์|บำรุง|ริ้วรอย|skin|serum|beauty/.test(combined);
-  const isFood = /กาแฟ|คาเฟ่|อาหาร|กิน|ย่าง|ทำอาหาร|ชิม|มัทฉะ|ครัว|เค้ก|ชา|cafe|food|cook|eat|restaurant/.test(combined);
+/**
+ * Extract clean core subject/location from user prompt
+ */
+function extractCleanSubject(rawText) {
+  if (!rawText) return 'ทริปเที่ยวสุดพิเศษ';
+  let s = String(rawText)
+    .split('\n')[0]
+    .replace(/^[🎬🎥✨🚗🎧📱🔥🏖️⛩️☕#\s*\d.)\-]+/, '')
+    .replace(/^(?:ขอสตอรี่บอร์ด|อยากได้สตอรี่บอร์ด|ช่วยคิดคอนเทนต์|อยากถ่ายคอนเทนต์|อยากถ่ายคลิป|พาไปเที่ยว|ไปเที่ยว|มาเที่ยว|พาเที่ยว|แวะเที่ยว|พามา|แวะ|รีวิว|คลิปสั้น|ไวรัล)\s*/gi, '')
+    .replace(/(?:อยากถ่ายคลิป.*|อยากถ่ายคอนเทนต์.*|อยากได้คอนเทนต์.*|ลง\s*tiktok.*|ลง\s*reels.*|จะทำคอนเทนต์อย่างไร.*|จะทำคอนเท้นอย่างไร.*|ทำยังไงให้น่าสนใจ.*|ยังไงดี.*|หน่อยครับ.*|หน่อยค่ะ.*)$/gi, '')
+    .replace(/(?:ขอ|เอา|จำนวน)\s*\d+\s*(?:ฉาก|ช็อต|ซีน|วินาที|วิ)/gi, '')
+    .trim();
+  if (!s || s.length < 2) s = String(rawText).trim().slice(0, 40);
+  return s.slice(0, 50);
+}
 
-  // Default values
-  let angle = 'Medium Shot';
-  let angleTh = 'ภาพมุมปานกลางโฟกัสการกระทำหลัก';
-  let lens = '35mm Anamorphic';
-  let movement = 'Smooth tracking follow';
-  let actionTh = beatText;
-  let dialogue = `จังหวะสำคัญของเรื่องราวที่ถ่ายทอดความรู้สึกได้อย่างน่าประทับใจครับ`;
-  let foley = `เสียงบรรยากาศสถานที่จริง (Ambient Tone) และเสียงการเคลื่อนไหวคมชัด`;
-  let promptEn = `${beatText}, natural cinematic commercial lighting, 8k, crisp details`;
+/**
+ * Generate a deeply connected, practical multi-shot story arc for any travel or content topic
+ */
+function buildConnectedStoryBeats(rawConcept, targetCount) {
+  const t = String(rawConcept || '').toLowerCase();
+  const subject = extractCleanSubject(rawConcept);
 
-  if (isFishing) {
-    if (/ได้ปลา|ปลากิน|เย่อ|ติดเบ็ด|ปลาตัวโต|สู้ปลา|ปลาติด|ดึงปลา|กระโดดเหนือน้ำ|งัดปลา|catch|strike|got fish|hook/.test(beatText.toLowerCase())) {
-      angle = 'Dynamic Low-Angle Action Shot';
-      angleTh = 'มุมต่ำภาพแอคชั่นดึงปลาตัวโตเหนือน้ำ';
-      lens = '28mm Lens';
-      movement = 'Fast Dynamic Snap Focus';
-      actionTh = `คันเบ็ดโค้งงออย่างรุนแรงเมื่อมีแรงดึงมหาศาล ละอองน้ำสาดกระจายระยิบระยับ ปลาตัวโตดิ้นกระโดดเหนือน้ำ สีหน้าตัวละครตื่นเต้นลุ้นระทึกขณะหมุนรอกด้วยความมุ่งมั่น`;
-      foley = `เสียงรอกลั่นดังสนั่น ละอองน้ำสาดกระจาย และเสียงเฮลั่นด้วยความสะใจ`;
-      dialogue = `"จังหวะสายเบ็ดตึงตัวและความตื่นเต้นเมื่อได้ปลาตัวโตสมการรอคอยครับ!"`;
-      promptEn = `Dynamic low-angle action shot, a heavy fishing rod deeply bent under tension, a fresh gleaming freshwater fish leaping out of splashing water droplets, bright sunlit morning, thrilling action blur, photorealistic 8k`;
-    } else if (/กิน|อร่อย|อเร็ด|เอร็ด|ชิม|ล้อมวง|ชนแก้ว|สุข|ทาน|ฉลอง|eat|delicious|taste|enjoy/.test(beatText.toLowerCase())) {
-      angle = 'Medium Shot Reaction & Joy';
-      angleTh = 'ภาพมุมปานกลางสีหน้าแห่งความสุขและความอร่อย';
-      lens = '50mm Master';
-      movement = 'Static Lock-Off with warm focus';
-      actionTh = `ทุกคนล้อมวงรอบโต๊ะแคมป์ปิ้งไม้ ตักเนื้อปลาควันกรุ่นรับประทานอย่างเอร็ดอร่อย พูดคุยหัวเราะและชนแก้วฉลองความสำเร็จของทริปท่ามกลางแสงอาทิตย์อัสดง`;
-      foley = `เสียงแก้วชนกัน เสียงหัวเราะอบอุ่น และดนตรีอคูสติกเบาๆ สร้างบรรยากาศผ่อนคลาย`;
-      dialogue = `"ปิดท้ายทริปด้วยรสชาติสดหวานและความสุขที่ได้แบ่งปันร่วมกันอย่างเอร็ดอร่อยครับ"`;
-      promptEn = `Medium shot, group of happy friends sitting around a rustic wooden camping table smiling and eating freshly grilled fish, joyful laughter, sunset golden hour lighting, cozy outdoor lifestyle commercial, photorealistic`;
-    } else if (/ทำอาหาร|ปิ้งย่าง|เตาย่าง|(?:^|[^\u0E2D])ย่าง|แล่|ปรุง|แคมป์|เตา|กระทะ|cook|grill|prepare/.test(beatText.toLowerCase())) {
-      angle = 'Extreme Close-Up Macro';
-      angleTh = 'ภาพโคลสอัพมาโครย่างปลาสดริมแคมป์';
-      lens = '85mm Macro';
-      movement = 'Gentle Macro Slider';
-      actionTh = `นำวัตถุดิบสดใหม่จากสายน้ำมาบรรจงย่างบนเตาถ่านไฟอ่อนริมแคมป์ ควันหอมฉุยลอยขึ้นมา โรยสมุนไพรสดและเกลือ เนื้อปลาเดือดฉ่าบนตะแกรงอย่างน่ารับประทาน`;
-      foley = `เสียงเนื้อปลาฉ่าบนตะแกรงย่าง และเสียงเปลาะแปะของถ่านไฟแคมป์ปิ้งอย่างน่ารับประทาน`;
-      dialogue = `"นำวัตถุดิบสดใหม่จากธรรมชาติมาปรุงเป็นเมนูเด็ดร้อนๆ ทันทีครับ"`;
-      promptEn = `Extreme close-up shot, fresh whole fish fillets grilling over a rustic outdoor campfire charcoal grill, aromatic wisps of smoke rising, fresh lemon and rosemary herbs, appetizing food commercial cinematography`;
-    } else if (/เลือกสินค้า|เลือกซื้อ|ดูคัน|ลองคัน|รอก|เหยื่อ|inspect|lure|reel/.test(beatText.toLowerCase()) || (index > 0 && /คันเบ็ด|อุปกรณ์/.test(beatText) && !/เรือ|น้ำ|บ่อ|ทะเล/.test(beatText))) {
-      angle = 'Medium Close-Up';
-      angleTh = 'ภาพมุมปานกลางเลือกดูอุปกรณ์ตกปลา';
-      lens = '50mm Prime';
-      movement = 'Subtle Handheld Follow';
-      actionTh = `มือหยิบคันเบ็ดคาร์บอนไฟเบอร์น้ำหนักเบาและรอกตกปลาโลหะขึ้นมาทดสอบความยืดหยุ่น รอบข้างมีเหยื่อปลอมหลากสีสันจัดเรียงสวยงามบนแผงโชว์ในร้าน`;
-      foley = `เสียงหมุนสปูลรอกตกปลาดังกริ๊กๆ ละเอียด และเสียงเคาะคันเบ็ดเบาๆ`;
-      dialogue = `"เลือกคันเบ็ดและเหยื่อตัวโปรดที่เหมาะกับหมายตกปลาของเราครับ"`;
-      promptEn = `Medium close-up shot, hands holding a sleek metallic fishing reel and inspecting a colorful lure inside a well-lit fishing equipment shop, detailed gear texture, warm interior lighting, shallow depth of field, photorealistic 8k`;
-    } else if (/ซื้อ|ร้าน|อุปกรณ์|หน้าร้าน|tackle|shop|buy/.test(beatText.toLowerCase()) || (index === 0 && /ชวน/.test(beatText))) {
-      angle = 'Wide Establishing Shot';
-      angleTh = 'ภาพมุมกว้างเปิดฉากหน้าร้านอุปกรณ์ตกปลา';
-      lens = '24mm Wide';
-      movement = 'Slow Dolly Push-In';
-      actionTh = `กลุ่มเพื่อน 2-3 คน ยืนพูดคุยอย่างตื่นเต้นหน้าร้านจำหน่ายอุปกรณ์ตกปลาขนาดใหญ่ มองดูสินค้าในตู้กระจกและชี้ชวนกันเข้าไปเลือกซื้อ แสงแดดยามเช้าสดใส`;
-      foley = `เสียงเปิดประตูกระจกร้าน แอมเบียนต์ถนนตอนเช้า และเสียงทักทายอย่างเป็นกันเอง`;
-      dialogue = `"ทริปวันหยุดนี้เริ่มต้นที่นี่ ชวนเพื่อนรู้ใจมาเตรียมความพร้อมด้วยกันครับ"`;
-      promptEn = `Wide establishing shot, group of cheerful friends standing outside a professional modern fishing tackle shop, pointing at storefront, morning soft daylight, high-end commercial cinematography, 8k, crisp details`;
-    } else if (/ออกไป|เดินทาง|ล่องเรือ|เรือ|ธรรมชาติ|หมาย|ผืนน้ำ|เหวี่ยง|ทอดสาย|travel|boat|lake|nature|cast/.test(beatText.toLowerCase())) {
-      angle = 'Atmospheric Tracking Shot';
-      angleTh = 'ภาพมุมกว้างแล่นเรือสู่หมายตกปลากลางธรรมชาติ';
-      lens = '35mm Wide';
-      movement = 'Smooth Gimbal Tracking along water';
-      actionTh = `เรือหางยาวแล่นผ่าสายหมอกบางยามเช้าบนผืนน้ำสงบสู่หมายตกปลากลางธรรมชาติ บรรยากาศเงียบสงบ แสงแดดอุ่นสาดส่องผิวน้ำระยิบระยับ`;
-      foley = `เสียงแหวกสายน้ำของเรือ เสียงนกร้องไกลๆ และเสียงสายลมพัดเบาๆ สดชื่น`;
-      dialogue = `"มุ่งหน้าสู่หมายลับ สัมผัสสายลมและธรรมชาติรอบตัวอย่างแท้จริงครับ"`;
-      promptEn = `Atmospheric tracking shot, an angler in outdoor gear standing on a wooden boat casting a fishing rod over a tranquil mist-covered lake surrounded by lush green hills, golden sunrise reflection on water surface, cinematic nature documentary`;
-    }
-  } else if (isCar) {
-    if (/เปิดตัว|คลุมผ้า|โชว์รูม|ผ้าซาติน|unveil|reveal|showroom/.test(beatText.toLowerCase())) {
-      angle = 'Wide Establishing Shot';
-      angleTh = 'ภาพมุมกว้างเปิดตัวรถในโชว์รูม';
-      lens = '24mm Cine';
-      movement = 'Slow Dolly Track';
-      actionTh = `เปิดตัวรถยนต์พรีเมียมคลุมผ้าซาตินในโชว์รูมกระจกโปร่ง แสงไฟสตูดิโอสะท้อนพื้นผิวหรูหรา บรรยากาศพรีเมียมเอ็กซ์คลูซีฟ`;
-      foley = `เสียงดนตรีเปิดตัวทรงพลังและเสียงบรรยากาศโชว์รูมหรูหรา`;
-      dialogue = `"สัมผัสความเหนือระดับของยนตรกรรมแห่งอนาคตที่พร้อมให้คุณเป็นเจ้าของครับ"`;
-      promptEn = `Wide establishing shot, sleek modern luxury car draped in black satin sheet inside a glass luxury showroom, premium atmospheric studio lighting, reflections, 8k`;
-    } else if (/ดึงผ้า|เผย|ไฟหน้า|กระจัง|pull|light|led/.test(beatText.toLowerCase())) {
-      angle = 'Medium Tracking Reveal';
-      angleTh = 'มุมเคลื่อนตามเปิดผ้าคลุมเผยไฟหน้า LED';
-      lens = '35mm Anamorphic';
-      movement = 'Low-Angle Tracking Follow';
-      actionTh = `ผ้าคลุมค่อยๆ เลื่อนออก เผยให้เห็นไฟหน้า LED ดีไซน์คมกริบและกระจังหน้าโฉบเฉี่ยว แสงไฟสะท้อนตัวถังเงางามสะกดทุกสายตา`;
-      foley = `เสียงผ้าซาตินเลื่อนพลิ้วไหว ASMR และเสียงระบบไฟ LED เปิดทำงานพร้อมเสียง Chime หรูหรา`;
-      dialogue = `"ดีไซน์ที่ผสมผสานความประณีตและเทคโนโลยีล้ำสมัย สะกดทุกสายตาตั้งแต่แรกเห็นครับ"`;
-      promptEn = `Medium shot, satin sheet sliding off a luxury car, revealing aggressive matrix LED headlights and glossy metallic paint, studio rim lighting, photorealistic 8k`;
-    } else if (/กุญแจ|ส่งมอบ|กล่อง|key|handover|deliver/.test(beatText.toLowerCase())) {
-      angle = 'Medium Close-Up Handover';
-      angleTh = 'ภาพมุมใกล้ส่งมอบกล่องกุญแจสมาร์ทคีย์';
-      lens = '50mm Prime';
-      movement = 'Steady-cam Focus Push';
-      actionTh = `พนักงานส่งมอบกล่องกุญแจหนังแท้และสมาร์ทคีย์ให้ลูกค้าด้วยรอยยิ้มอบอุ่น สัมผัสถึงความใส่ใจในทุกรายละเอียดของการบริการ`;
-      foley = `เสียงเปิดฝากล่องกุญแจหนังแท้และเสียงสัมผัสโลหะกุญแจพรีเมียม`;
-      dialogue = `"ยินดีต้อนรับสู่ครอบครัวแห่งความสุข พร้อมการเดินทางครั้งใหม่ของคุณครับ"`;
-      promptEn = `Medium close-up shot, a professional sales consultant handing over a luxury leather key box with a sleek smart key to a smiling customer, warm ambient lighting, 8k`;
-    } else if (/รับ|ดีใจ|ครอบครัว|โบว์|ถ่ายรูป|photo|smile|happy/.test(beatText.toLowerCase())) {
-      angle = 'Medium Shot Joyful Celebration';
-      angleTh = 'ภาพมุมปานกลางรอยยิ้มแห่งความประทับใจหน้ารถ';
-      lens = '50mm Master';
-      movement = 'Gentle Arc Pan';
-      actionTh = `ลูกค้ารับมอบกุญแจด้วยรอยยิ้มเปี่ยมสุข ถ่ายรูปคู่กับรถคันใหม่ที่ประดับโบว์แดงอย่างสง่างาม ท่ามกลางบรรยากาศเฉลิมฉลองอันอบอุ่น`;
-      foley = `เสียงชัตเตอร์กล้องถ่ายรูป เสียงปรบมือแสดงความยินดี และเสียงหัวเราะแห่งความสุข`;
-      dialogue = `"ช่วงเวลาแห่งความภาคภูมิใจและรอยยิ้มของทุกคนในครอบครัวครับ"`;
-      promptEn = `Medium shot, happy customer standing beside a brand-new luxury SUV adorned with a giant red ribbon, holding keys, joyful smiles, celebratory atmosphere, 8k`;
-    } else if (/พวงมาลัย|ห้องโดยสาร|หน้าจอ|ภายใน|interior|steering|cockpit/.test(beatText.toLowerCase())) {
-      angle = 'Over-The-Shoulder Cockpit';
-      angleTh = 'มุมมองข้ามไหล่สัมผัสความหรูหราในห้องโดยสาร';
-      lens = '35mm Wide';
-      movement = 'Slow Creeping Push-In';
-      actionTh = `มือสัมผัสพวงมาลัยหนังแท้เย็บมืออันประณีต หน้าจอดิจิทัลแบบพาโนรามาสว่างขึ้นพร้อมระบบอินโฟเทนเมนต์ล้ำสมัย แสงไฟแอมเบียนต์หรูหรา`;
-      foley = `เสียงสัมผัสลูบไล้หนังแท้ ASMR และเสียงบูตหน้าปัดดิจิทัล EV คลื่นเสียงไซไฟนุ่มนวล`;
-      dialogue = `"ทุกผิวสัมผัสถูกรังสรรค์ด้วยความประณีตระดับงานฝีมือ มอบความสะดวกสบายสูงสุดทุกการเดินทางครับ"`;
-      promptEn = `Over-the-shoulder shot inside luxury car cockpit, driver touching soft stitched leather steering wheel, glowing panoramic digital dashboard waking up, ambient mood light`;
-    } else if (/ขับ|เคลื่อนตัว|ถนน|เดินทาง|drive|departure|road/.test(beatText.toLowerCase())) {
-      angle = 'Low-Angle Hero Tracking';
-      angleTh = 'มุมต่ำเคลื่อนตามรถแล่นออกสู่ถนนยามเย็น';
-      lens = '28mm Cine';
-      movement = 'Low Tracking Slider';
-      actionTh = `รถยนต์เคลื่อนตัวออกจากโชว์รูมอย่างนุ่มนวลและเงียบกริบ สู่ถนนกว้างยามเย็น แสงอาทิตย์สีทองสะท้อนตัวถังเงางาม ขับเคลื่อนสู่อนาคต`;
-      foley = `เสียงมอเตอร์ไฟฟ้าทำงานเงียบสนิท เสียงยางสัมผัสพื้นถนนเรียบกริบ และดนตรีฟินาเล่ทรงพลัง`;
-      dialogue = `"เริ่มต้นทุกบทการเดินทางด้วยความมั่นใจและสุนทรียภาพแห่งการขับขี่ที่แท้จริงครับ"`;
-      promptEn = `Dynamic low-angle tracking shot, a sleek modern luxury vehicle driving smoothly out of showroom onto open road during golden hour sunset, specular reflections on paint, cinematic masterpiece`;
-    }
-  } else if (isFood) {
-    if (/หน้าร้าน|เดินเข้า|ประตู|บรรยากาศ|entrance|door|atmosphere/.test(beatText.toLowerCase())) {
-      angle = 'Wide Establishing Shot';
-      angleTh = 'ภาพมุมกว้างเปิดตัวหน้าร้านและบรรยากาศอันอบอุ่น';
-      lens = '24mm Wide';
-      movement = 'Slow Dolly In';
-      actionTh = `ผลักประตูไม้เข้าสู่ร้าน กลิ่นหอมกรุ่นของอาหารและเครื่องดื่มลอยมาต้อนรับ บรรยากาศตกแต่งอบอุ่น แสงไฟวอร์มไวท์นุ่มนวล`;
-      foley = `เสียงกระดิ่งเปิดประตู แอมเบียนต์ร้านอาหารแสนอบอุ่น และเสียงดนตรีแจ๊สเบาๆ`;
-      dialogue = `"สัมผัสความอร่อยและบรรยากาศสุดชิลล์ที่พร้อมให้คุณมาเช็กอินแล้ววันนี้ครับ"`;
-      promptEn = `Wide establishing shot, welcoming entrance of a cozy aesthetic cafe with warm ambient lighting, wooden architecture, inviting atmosphere, 8k`;
-    } else if (/ทำ|ชง|ปรุง|ตี|เท|cook|brew|pour/.test(beatText.toLowerCase())) {
-      angle = 'Medium Close-Up Action';
-      angleTh = 'ภาพมุมปานกลางโฟกัสการรังสรรค์เมนูพิถีพิถัน';
-      lens = '50mm Prime';
-      movement = 'Smooth Handheld Tracking';
-      actionTh = `เชฟหรือบาริสต้ากำลังรังสรรค์เมนูอย่างตั้งใจ การเทเครื่องดื่มแยกชั้นสวยงาม หรือการผัดปรุงอาหารด้วยไฟร้อนระอุ`;
-      foley = `เสียงของเหลวเทลงแก้วอย่างนุ่มนวล หรือเสียงกระทะผัดไฟลุกฉ่า`;
-      dialogue = `"ใส่ใจในทุกขั้นตอนเพื่อรสชาติที่เป็นเอกลักษณ์ในทุกๆ เมนูครับ"`;
-      promptEn = `Medium close-up shot, skilled barista pouring creamy steamed milk creating intricate latte art in a ceramic cup, warm steam rising, shallow depth of field, 8k`;
-    } else if (/ขนม|จาน|อาหาร|โคลสอัพ|จานเด็ด|dish|plate|dessert/.test(beatText.toLowerCase())) {
-      angle = 'Extreme Close-Up Macro Food';
-      angleTh = 'ภาพมาโครเจาะรายละเอียดความน่ารับประทาน';
-      lens = '85mm Macro';
-      movement = 'Slow Linear Slider';
-      actionTh = `ภาพโคลสอัพจานอาหารหรือขนมซิกเนเจอร์ ควันหอมฉุยลอยขึ้นมา สีสันสดชื่น วัตถุดิบคุณภาพพรีเมียมจัดจานอย่างมีระดับ`;
-      foley = `เสียงซอสหยดช้าๆ หรือเสียงตัดผ่านความกรอบนอกนุ่มในอย่างน่าลิ้มลอง`;
-      dialogue = `"ความอร่อยที่ชวนให้สัมผัส รสชาติเข้มข้นถึงใจตั้งแต่คำแรกครับ"`;
-      promptEn = `Extreme close-up macro shot, mouth-watering gourmet dish with glistening sauce and delicate fresh garnish, soft natural window light, appetizing food photography`;
-    } else if (/กิน|ชิม|ตัก|อร่อย|ฟิน|eat|taste|delicious/.test(beatText.toLowerCase())) {
-      angle = 'Medium Shot Joyful Tasting';
-      angleTh = 'ภาพมุมปานกลางสีหน้าฟินขณะลิ้มลองความอร่อย';
-      lens = '50mm Master';
-      movement = 'Static Lock-Off';
-      actionTh = `ตักอาหารคำโตเข้าปาก สีหน้ายิ้มกว้างด้วยความประทับใจในรสชาติอันยอดเยี่ยม ชื่นชมความกลมกล่อมอย่างมีความสุข`;
-      foley = `เสียงความกรุบกรอบและเสียงพึมพำชื่นชมความอร่อยอย่างเป็นธรรมชาติ`;
-      dialogue = `"รสชาติกลมกล่อมที่ใครได้ลองก็ต้องตกหลุมรักครับ"`;
-      promptEn = `Medium shot, person tasting delicious food with a joyful satisfied expression, cozy natural sunlight filtering through cafe window, warm authentic lifestyle`;
-    }
-  } else if (isSkincare) {
-    if (/ขวด|สินค้า|ผลิตภัณฑ์|เซรั่ม|bottle|product|serum/.test(beatText.toLowerCase())) {
-      angle = 'Extreme Close-Up Product Hero';
-      angleTh = 'ภาพมาโครเจาะลึกขวดเซรั่มกระจกใส';
-      lens = '100mm Macro';
-      movement = 'Slow Circular Orbit';
-      actionTh = `ขวดเซรั่มแก้วใสวางเด่นบนผิวน้ำกระทบแสงแดดเช้า มีหยดน้ำระยิบระยับเกาะรอบขวด สะท้อนความบริสุทธิ์และเข้มข้นของสารสกัด`;
-      foley = `เสียงน้ำกระเพื่อมแผ่วเบา และเสียงกริ๊กเบาๆ ของฝาดรอปเปอร์กระจกพรีเมียม`;
-      dialogue = `"สัมผัสพลังแห่งการฟื้นบำรุงล้ำลึก เพื่อผิวเปล่งประกายสุขภาพดีครับ"`;
-      promptEn = `Extreme close-up macro hero shot of a luxury glass serum bottle sitting in tranquil shallow water ripples, soft golden morning light, glistening water droplets, minimalist cosmetic ad`;
-    } else if (/หยด|ดรอปเปอร์|เนื้อเซรั่ม|หลังมือ|drop|dropper/.test(beatText.toLowerCase())) {
-      angle = 'Macro Action Dropper';
-      angleTh = 'ภาพมาโครดรอปเปอร์หยดเนื้อเซรั่มเข้มข้น';
-      lens = '85mm Macro';
-      movement = 'Slow Vertical Tilt Down';
-      actionTh = `ดรอปเปอร์แก้วค่อยๆ ปล่อยหยดเนื้อเซรั่มใสเข้มข้นตกลงสู่ผิวหลังมืออย่างช้าๆ เนื้อสัมผัสเข้มข้นแต่บางเบาพร้อมซึมซาบ`;
-      foley = `เสียงหยดน้ำสัมผัสผิว ASMR นุ่มนวล ชวนผ่อนคลาย`;
-      dialogue = `"เนื้อเซรั่มบางเบา ซึมซาบไว ไม่เหนียวเหนอะหนะครับ"`;
-      promptEn = `Macro shot, a glass dropper releasing a glistening golden serum droplet falling towards skin, soft morning studio light, shallow depth of field, photorealistic 8k`;
-    } else if (/ทา|เกลี่ย|แก้ม|นวด|apply|blend|massage/.test(beatText.toLowerCase())) {
-      angle = 'Close-Up Gentle Application';
-      angleTh = 'ภาพโคลสอัพเกลี่ยเนื้อเซรั่มลงบนแก้ม';
-      lens = '85mm Portrait';
-      movement = 'Smooth Floating Push-In';
-      actionTh = `ปลายนิ้วเกลี่ยเนื้อเซรั่มลงบนพวงแก้มอย่างอ่อนโยน เนื้อเซรั่มแตกตัวซึมสู่ผิวทันที เผยความชุ่มชื้นอิ่มน้ำ`;
-      foley = `เสียงลูบไล้ผิวสัมผัสแผ่วเบา สไตล์บิวตี้ ASMR บริสุทธิ์`;
-      dialogue = `"คืนความชุ่มชื้น เผยผิวอิ่มฟูฉ่ำโกลว์ในทุกๆ วันครับ"`;
-      promptEn = `Close-up shot, gentle fingertip applying clear dewy serum onto woman's cheek, glowing skin texture, soft diffused window light, high-end skincare commercial`;
-    } else if (/ผิวฉ่ำ|โกลว์|อิ่มน้ำ|glass skin|glow|radiant/.test(beatText.toLowerCase())) {
-      angle = 'Extreme Close-Up Radiant Skin';
-      angleTh = 'ภาพมาโครเจาะลึกผิวฉ่ำวาว Glass Skin';
-      lens = '100mm Macro';
-      movement = 'Slow Rack Focus';
-      actionTh = `ซูมเจาะลึกผิวหน้าที่ดูเรียบเนียน ฉ่ำวาว อิ่มน้ำ สุขภาพดีไร้ที่ติ มีประกายอิ่มเอิบสะท้อนแสงอย่างเป็นธรรมชาติ`;
-      foley = `เสียง Chime สดใสเบาๆ สื่อถึงความเปล่งประกายแห่งผิวพรรณ`;
-      dialogue = `"ผลลัพธ์ผิวสุขภาพดี ฉ่ำโกลว์ มีออร่าอย่างเห็นได้ชัดครับ"`;
-      promptEn = `Extreme close-up shot, radiant dewy glass skin texture with healthy natural luster, pristine studio light, crisp beauty editorial photography`;
-    } else if (/กระจก|ยิ้ม|มั่นใจ|smile|mirror|confident/.test(beatText.toLowerCase())) {
-      angle = 'Medium Close-Up Confident Reaction';
-      angleTh = 'ภาพมุมปานกลางรอยยิ้มมั่นใจหน้ากระจก';
-      lens = '50mm Master';
-      movement = 'Static Lock-Off with soft light';
-      actionTh = `นางแบบส่องกระจกด้วยรอยยิ้มพึงพอใจและมั่นใจในผิวหน้าสดที่ดูสดใสเปล่งปลั่ง เสริมสร้างความมั่นใจในทุกช่วงเวลา`;
-      foley = `เสียงดนตรีบรรเลงอบอุ่น ปิดท้ายด้วยความมั่นใจ`;
-      dialogue = `"พร้อมเผยผิวสวย มั่นใจได้ในแบบของคุณตั้งแต่วันแรกครับ"`;
-      promptEn = `Medium shot, confident beautiful woman smiling gently in bathroom mirror, admiring radiant clear skin, bright clean minimalist aesthetic, photorealistic`;
-    }
+  // 1. Temple / Cultural / Landmark / Shrine (เที่ยววัด, ไหว้พระ, เมืองเก่า, แลนด์มาร์ค)
+  if (/วัด|ไหว้พระ|ขอพร|พระปรางค์|เจดีย์|เมืองเก่า|อยุธยา|พระแก้ว|วัดอรุณ|สายมู|โบราณสถาน|temple|shrine/.test(t)) {
+    const pool = [
+      {
+        title: `ช็อตเปิด Hook: มุมไฮไลท์ต้องมนต์ของ${subject}`,
+        angle: 'Low Angle Hero Shot',
+        angleTh: 'มุมเสยต่ำเห็นสถาปัตยกรรมยิ่งใหญ่ (เลนส์ 0.5x)',
+        lens: 'เลนส์ 0.5x Ultra-Wide',
+        movement: 'เดินถือกล้องดันเข้าช้าๆ (Slow Push-In)',
+        duration: 2.5,
+        action: `ตั้งกล้องมุมต่ำระดับเอวเชิดขึ้นเห็นยอดพระปรางค์/อุโบสถของ${subject}ตัดกับท้องฟ้า ให้ตัวแบบหันหลังเดินก้าวเข้าเฟรมช้าๆ แล้วหันมายิ้มให้กล้อง`,
+        onScreenText: `📍 ${subject} มุมนี้สวยเหมือนหลุดไปอีกโลก! ✨`,
+        spaceGuide: '📐 เว้นพื้นที่ท้องฟ้าด้านบน 30% สำหรับวางพาดหัวใหญ่สีขาว-ทอง ไม่ให้บังยอดสถาปัตยกรรม',
+        dialogue: `(น้ำเสียงตื่นเต้น ชวนหยุดดู) "ทุกคน... ใครจะคิดว่ามา${subject}เวลานี้ แสงจะสวยอลังการขนาดนี้ ตามมาดูมุมเด็ดกันครับ!"`,
+        foley: 'เสียงกระดิ่งลมวัดเบาๆ ผสานเพลงบรรเลงร่วมสมัยโทนอบอุ่นสงบ',
+        promptEn: `Low angle wide establishing shot at a breathtaking Thai temple (${subject}), ornate golden pagoda spire glowing under warm golden hour sunlight, traveler walking gracefully into frame, cinematic travel photography, 8k`
+      },
+      {
+        title: `เดินลอดซุ้มประตูเข้าสู่บรรยากาศสงบ`,
+        angle: 'Over-the-Shoulder Shot',
+        angleTh: 'มุมมองตามหลังเดินลอดซุ้มประตู (เลนส์ 1x)',
+        lens: 'เลนส์ 1x มุมปกติ',
+        movement: 'เดินถือกล้องตามหลังนิ่งๆ (Gimbal Walk Follow)',
+        duration: 3.0,
+        action: `ถือกล้องเดินตามหลังตัวแบบขณะก้าวผ่านซุ้มประตูวัด เผยให้เห็นลานวัดและแสงแดดที่ส่องลอดเงาไม้กระทบพื้นหิน`,
+        onScreenText: `บรรยากาศเงียบสงบ ฮีลใจสุดๆ 🍃`,
+        spaceGuide: '📐 จัดตัวแบบไว้กึ่งกลางค่อนซ้าย เว้นพื้นที่ว่างฝั่งขวาสำหรับใส่ข้อความบอกเวลาที่แนะนำ',
+        dialogue: `(น้ำเสียงนุ่มนวล ผ่อนคลาย) "แค่ก้าวเข้ามาด้านใน ความวุ่นวายข้างนอกก็หายไปหมดเลยครับ ลมพัดเย็นสบายมาก"`,
+        foley: 'เสียงฝีเท้าเดินเบาๆ และเสียงนกร้องในบริเวณวัด',
+        promptEn: `Over-the-shoulder tracking shot following a traveler stepping through an ancient ornate temple archway into a peaceful sunlit courtyard, soft natural light rays, shallow depth of field, 8k`
+      },
+      {
+        title: `เจาะดีเทลลวดลายศิลปะ & แสงเงาใกล้ๆ`,
+        angle: 'Extreme Close-up / Macro',
+        angleTh: 'มุมใกล้เจาะลวดลายประณีตละลายหลัง (เลนส์ 2x)',
+        lens: 'เลนส์ 2x Portrait / Tele',
+        movement: 'แพนกล้องเลื่อนช้าๆ จากซ้ายไปขวา (Slow Pan)',
+        duration: 3.0,
+        action: `ซูมเลนส์ 2x ถ่ายเจาะรายละเอียดลวดลายกระเบื้องเคลือบ/งานปั้นศิลปะของ${subject} ที่ต้องแสงแดดเป็นประกาย โดยให้ฉากหลังเบลอสวย`,
+        onScreenText: `งานศิลปะละเอียดทุกตารางนิ้ว 🔍`,
+        spaceGuide: '📐 โฟกัสลวดลายตรงกลางภาพ เว้นขอบล่าง 20% สำหรับวางซับไตเติล',
+        dialogue: `(น้ำเสียงชื่นชม) "ลองดูดีเทลงานฝีมือใกล้ๆ สิครับ พอโดนแสงแดดช่วงเย็นแบบนี้คือเป็นประกายสวยทุกมุมจริงๆ"`,
+        foley: 'เสียงดนตรีอคูสติกนุ่มๆ คลอเบาๆ',
+        promptEn: `Extreme close-up macro shot of intricate traditional Thai porcelain mosaic and golden architectural craftsmanship glowing in warm sunlight, creamy bokeh background, 8k`
+      },
+      {
+        title: `โมเมนต์ไหว้พระขอพรเสริมสิริมงคล`,
+        angle: 'Medium Close-up',
+        angleTh: 'มุมระดับอกด้านข้างเห็นใบหน้าอิ่มบุญ (เลนส์ 1x)',
+        lens: 'เลนส์ 1x หรือ 2x',
+        movement: 'ถือกล้องนิ่งโฟกัสที่ใบหน้า (Static Focus)',
+        duration: 3.0,
+        action: `ถ่ายจากด้านข้างเฉียง 45 องศา ขณะตัวแบบพนมมือไหว้พระหรือจุดธูปเทียนขอพรด้วยสีหน้าสงบและมีรอยยิ้มอ่อนโยน`,
+        onScreenText: `🙏 แวะไหว้พระขอพร เติมพลังบวก`,
+        spaceGuide: '📐 จัดใบหน้าอยู่ฝั่งขวาบนของเฟรม เว้นพื้นที่ฝั่งซ้ายล่างวางข้อความคำอธิษฐาน/จุดไหว้',
+        dialogue: `(น้ำเสียงอบอุ่น จริงใจ) "ได้แวะมาไหว้พระขอพร ตั้งจิตอธิษฐานดีๆ เหมือนได้ชาร์จพลังใจกลับไปเต็มร้อยเลยครับ"`,
+        foley: 'เสียงบรรยากาศความสงบและเสียงระฆังวัดกังวานเบาๆ',
+        promptEn: `Medium close-up shot, traveler with hands pressed together in respectful Thai Wai prayer inside a softly lit temple hall, peaceful warm smile, golden candlelight glow, photorealistic 8k`
+      },
+      {
+        title: `มุมลับถ่ายรูปเช็กอินที่ห้ามพลาด`,
+        angle: 'Medium Shot',
+        angleTh: 'มุมระดับสายตาครึ่งตัว คู่ฉากหลังไฮไลท์ (เลนส์ 1x)',
+        lens: 'เลนส์ 1x ระยะสายตา',
+        movement: 'ค่อยๆ ถอยกล้องออกช้าๆ (Slow Pull-Back)',
+        duration: 3.0,
+        action: `ให้ตัวแบบยืนพิงระเบียงหรือมุมบันไดสวยๆ ของ${subject} หันข้างเล็กน้อยแล้วหันมายิ้มให้กล้อง ได้ภาพเหมือนปกแมกกาซีน`,
+        onScreenText: `📸 มุมถ่ายรูปมหาชน ได้รูปปังแน่นอน!`,
+        spaceGuide: '📐 เว้นพื้นที่ด้านบนศีรษะ 25% สำหรับวางป้ายพิกัดมุมถ่ายรูป',
+        dialogue: `(น้ำเสียงสดใส เป็นกันเอง) "ส่วนมุมตรงนี้บอกเลยว่าห้ามพลาดครับ ยืนมุมไหนก็ได้รูปสวยจึ้งไม่ต้องพึ่งฟิลเตอร์เลย"`,
+        foley: 'เสียงชัตเตอร์กล้อง 2 จังหวะ + เพลงจังหวะสดใสขึ้น',
+        promptEn: `Medium portrait shot of a cheerful traveler posing at the most scenic corner of ${subject}, warm golden hour rim light, aesthetic travel lifestyle vlog, 8k`
+      },
+      {
+        title: `สรุปทริป & ชวนปักหมุดตามรอยวันหยุดนี้`,
+        angle: 'Wide Establishing Shot',
+        angleTh: 'มุมกว้างเก็บภาพรวมยามเย็น + โบกมือลา (เลนส์ 1x)',
+        lens: 'เลนส์ 1x มุมกว้าง',
+        movement: 'แพนกล้องขึ้นสู่ท้องฟ้าช้าๆ (Slow Tilt Up)',
+        duration: 3.0,
+        action: `ถ่ายภาพมุมกว้างเห็นวิว${subject}ท่ามกลางแสงทไวไลท์ ตัวแบบหันมายิ้มโบกมือหรือชูนิ้วชวนคนดูมาเที่ยวตาม`,
+        onScreenText: `📌 เซฟคลิปไว้ตามรอยวันหยุดนี้เลย!`,
+        spaceGuide: '📐 เว้นพื้นที่กลางจอค่อนล่างสำหรับใส่กรอบข้อความสรุป เวลาเปิด-ปิด และการเดินทาง',
+        dialogue: `(น้ำเสียงชวนติดตาม) "ใครกำลังหาที่เที่ยวฮีลใจใกล้ๆ แนะนำให้เซฟคลิปนี้ไว้ แล้วชวนคนรู้ใจมาตามรอยวันหยุดนี้เลยนะครับ!"`,
+        foley: 'เพลงประกอบท่อนฮุคจบสวยงาม ประทับใจ',
+        promptEn: `Cinematic wide sunset shot of ${subject} glowing against a warm twilight sky, happy traveler smiling towards camera inviting viewers, travel commercial finale, 8k`
+      }
+    ];
+    return selectEvenly(pool, targetCount);
   }
 
-  // Ensure promptEn includes camera angle and visual style
-  const finalPrompt = `${angle}, ${lens} lens, ${promptEn}, ${visualStyleEn || 'cinematic commercial lighting'}, hyper-realistic, crisp details, 8k`;
-  const videoPrompt = `[Camera: ${movement}] [Shot: ${angle}] [Action: ${promptEn}] [Style: ${visualStyleEn || 'cinematic'}], smooth 60fps motion, 8k`;
+  // 2. Cafe / Food / Street Food / Night Market (คาเฟ่, ของกิน, ร้านอาหาร, ตลาดนัด)
+  if (/คาเฟ่|กาแฟ|ร้านอาหาร|ของกิน|กิน|สตรีทฟู้ด|ตลาด|เยาวราช|มัทฉะ|เค้ก|ชา|ก๋วยเตี๋ยว|บุฟเฟต์|cafe|coffee|food/.test(t)) {
+    const pool = [
+      {
+        title: `ช็อตเปิด Hook: เมนูซิกเนเจอร์ยั่วน้ำลายตรงหน้ากล้อง`,
+        angle: 'Close-up Shot',
+        angleTh: 'มุมใกล้ยื่นอาหาร/แก้วเครื่องดื่มเข้าหากล้อง (เลนส์ 1x)',
+        lens: 'เลนส์ 1x โฟกัสใกล้',
+        movement: 'ดันกล้องเข้าหาอาหารช้าๆ (Push-In)',
+        duration: 2.5,
+        action: `เริ่มต้นด้วยช็อตถือแก้วเครื่องดื่มหรือตักเมนูเด็ดของ ${subject} ยื่นเข้าหากล้องให้เห็นความฉ่ำ/ควันหอมกรุ่น โดยมีบรรยากาศร้านสวยๆ เบลออยู่ด้านหลัง`,
+        onScreenText: `🔥 ค้นพบร้านเด็ด! ${subject} ที่ต้องมาซ้ำ`,
+        spaceGuide: '📐 เว้นพื้นที่ด้านบน 30% สำหรับใส่พาดหัวตัวโตสีสดใส ดึงคนดูหยุดเลื่อนนิ้ว',
+        dialogue: `(น้ำเสียงตื่นเต้น ชวนหิว) "ทุกคน! วันนี้พามาเจอ ${subject} บอกเลยว่าทั้งบรรยากาศทั้งเมนูตรงหน้าคือเกินต้านมาก!"`,
+        foley: 'เสียงน้ำแข็งกระทบแก้วสดชื่น หรือเสียงอาหารร้อนๆ + เพลงจังหวะสนุก',
+        promptEn: `Appetizing close-up shot holding a signature drink and gourmet dish towards camera at ${subject}, warm natural daylight, shallow depth of field, vibrant lifestyle food vlog, 8k`
+      },
+      {
+        title: `พาเดินเปิดประตูเข้าร้าน เก็บบรรยากาศรอบๆ`,
+        angle: 'Wide Establishing Shot',
+        angleTh: 'มุมกว้างเดินเข้าร้านเห็นการตกแต่ง (เลนส์ 0.5x)',
+        lens: 'เลนส์ 0.5x Ultra-Wide',
+        movement: 'เดินถือกล้องก้าวผ่านประตูเข้าร้าน (Walk-In POV)',
+        duration: 3.0,
+        action: `ถ่ายมุมกว้างตั้งแต่หน้าร้าน ผลักประตูเดินเข้าไปเห็นมุมที่นั่ง แสงธรรมชาติที่ส่องผ่านหน้าต่าง และการตกแต่งร้านที่มีเอกลักษณ์`,
+        onScreenText: `✨ มู้ดร้านดีมาก แสงสวยทุกมุม`,
+        spaceGuide: '📐 เว้นพื้นที่มุมซ้ายบนหรือด้านล่างสำหรับใส่ชื่อร้านและโซนที่นั่งแนะนำ',
+        dialogue: `(น้ำเสียงสดใส เล่าให้เพื่อนฟัง) "ตัวร้านตกแต่งมู้ดดีสุดๆ ครับ โปร่งโล่ง แสงธรรมชาติเข้าสวยทุกมุม สายถ่ายรูปต้องเลิฟแน่นอน"`,
+        foley: 'เสียงกระดิ่งประตูร้าน + เพลง Lo-Fi / Jazz เบาๆ ในร้าน',
+        promptEn: `Wide POV walking shot entering a beautifully designed aesthetic cafe (${subject}), warm sunlight streaming through large windows, cozy interior design, 8k`
+      },
+      {
+        title: `ช็อตกำลังทำสดๆ / เทเครื่องดื่มแยกชั้นสวยๆ`,
+        angle: 'Medium Close-up',
+        angleTh: 'มุมเจาะตอนบาริสต้า/เชฟกำลังทำเมนูเด็ด (เลนส์ 2x)',
+        lens: 'เลนส์ 2x ซูมเจาะแอคชั่น',
+        movement: 'ถือกล้องนิ่งโฟกัสที่มือและการเท (Static Detail)',
+        duration: 2.5,
+        action: `ถ่ายเจาะจังหวะกำลังเทนมลงในกาแฟแยกชั้น หรือกำลังราดซอส/เสิร์ฟอาหารลงบนโต๊ะแบบเห็นการเคลื่อนไหวชัดๆ`,
+        onScreenText: `ทำสดใหม่แก้วต่อแก้ว พิถีพิถันสุดๆ ☕`,
+        spaceGuide: '📐 จัดจุดเทอยู่กลางภาพ เว้นพื้นที่ด้านบนใส่ชื่อเมนูและราคา',
+        dialogue: `(น้ำเสียงน่าติดตาม) "ความเด็ดคือเขาคัดวัตถุดิบดีมาก ทำสดใหม่กลิ่นหอมฟุ้งไปทั้งร้านเลยครับ"`,
+        foley: 'เสียงเทเครื่องดื่ม ASMR หรือเสียงเสิร์ฟจานอาหารคมชัด',
+        promptEn: `Medium close-up shot of barista pouring rich espresso over milk creating beautiful layers at ${subject}, steam rising, crisp commercial food cinematography, 8k`
+      },
+      {
+        title: `มาโครเจาะเนื้อสัมผัสอาหาร/ขนมแบบใกล้สุดๆ`,
+        angle: 'Extreme Close-up / Macro',
+        angleTh: 'มุมมาโครตักเค้ก/อาหารเห็นความฉ่ำเยิ้ม (เลนส์ 2x)',
+        lens: 'เลนส์ 2x Macro',
+        movement: 'เลื่อนกล้องเข้าช้าๆ ขณะใช้ช้อนตัด (Slow Slide)',
+        duration: 3.0,
+        action: `ใช้ช้อนตักหรือหั่นเมนูไฮไลท์ช้าๆ ให้เห็นความนุ่มฟูหรือไส้เยิ้มๆ เต็มเฟรม`,
+        onScreenText: `ดูความฉ่ำนี้สิ... เต็มสิบไม่หัก! 🤤`,
+        spaceGuide: '📐 เว้นพื้นที่ด้านล่าง 20% สำหรับวางซับไตเติลบรรยายรสชาติ',
+        dialogue: `(น้ำเสียงฟินๆ) "ดูเนื้อสัมผัสใกล้ๆ สิครับ นุ่มละมุนมาก พอตักขึ้นมาคือหอมสุดๆ"`,
+        foley: 'เสียงช้อนตักผ่านขนม/อาหาร ASMR ชัดเจน',
+        promptEn: `Extreme macro shot of a spoon cutting into a decadent signature dessert/dish at ${subject}, rich glossy texture, soft natural window light, 8k`
+      },
+      {
+        title: `ช็อตชิมคำแรก & รีแอคชั่นความอร่อยจริงใจ`,
+        angle: 'Medium Shot',
+        angleTh: 'มุมระดับสายตาถ่ายตอนชิมแล้วพยักหน้าฟิน (เลนส์ 1x)',
+        lens: 'เลนส์ 1x ระยะสายตา',
+        movement: 'ถือกล้องนิ่งระดับสายตา (Eye-Level)',
+        duration: 3.0,
+        action: `ถ่ายตัวแบบตักอาหารชิมคำแรกหรือยกแก้วขึ้นดื่ม แล้วหันมายิ้มตาเป็นประกาย พยักหน้าคอนเฟิร์มความอร่อย`,
+        onScreenText: `รสชาติกลมกล่อม อร่อยแสงออกปาก! ⭐`,
+        spaceGuide: '📐 จัดตัวแบบอยู่กลางภาพ เว้นพื้นที่ด้านบนศีรษะสำหรับใส่คะแนนรีวิว (เช่น 10/10)',
+        dialogue: `(น้ำเสียงประทับใจ) "คำแรกเข้าไปคือว้าวเลย รสชาติกลมกล่อม ไม่หวานโดด ลงตัวมากๆ ครับ"`,
+        foley: 'เสียงเอฟเฟกต์ปิ๊งสดใส + เสียงเพลงสนุกสนาน',
+        promptEn: `Medium shot of a happy vlogger tasting delicious food and smiling with genuine delight at ${subject}, bright natural cafe lighting, authentic lifestyle, 8k`
+      },
+      {
+        title: `สรุปพิกัดร้าน & ชวนเพื่อนตามมาเช็กอิน`,
+        angle: 'Medium Shot',
+        angleTh: 'มุมถ่ายคู่โต๊ะอาหารพร้อมยกแก้วชวนคนดู (เลนส์ 1x)',
+        lens: 'เลนส์ 1x มุมปกติ',
+        movement: 'ค่อยๆ ถอยกล้องออกเห็นทั้งโต๊ะ (Pull-Out)',
+        duration: 3.0,
+        action: `เห็นตัวแบบนั่งยิ้มสดใสพร้อมเมนูบนโต๊ะ ยกแก้วชนกล้องเหมือนชวนคนดูมาด้วยกัน`,
+        onScreenText: `📍 พิกัด: ${subject} (กดเซฟไว้ตามมาเลย!)`,
+        spaceGuide: '📐 เว้นพื้นที่ว่างด้านล่าง 25% สำหรับใส่ป้ายพิกัด เวลาเปิด-ปิด และที่จอดรถ',
+        dialogue: `(น้ำเสียงชวนคุย) "ใครสายกินสายคาเฟ่ กดเซฟคลิปนี้ไว้แล้วแท็กชวนเพื่อนตามมาเช็กอินที่ ${subject} กันได้เลยครับ!"`,
+        foley: 'เพลงจบฟีลกู๊ด สดใส',
+        promptEn: `Medium wide shot of cheerful creator raising a drink towards camera at a beautifully arranged table at ${subject}, warm inviting vibe, 8k`
+      }
+    ];
+    return selectEvenly(pool, targetCount);
+  }
+
+  // 3. Sea / Beach / Mountain / Nature / Camping / Hotel (ทะเล, ภูเขา, ดอย, แคมป์ปิ้ง, ที่พัก)
+  if (/ทะเล|ชายหาด|เกาะ|ภูเขา|ดอย|หมอก|แคมป์|กางเต็นท์|น้ำตก|ที่พัก|โรงแรม|พูลวิลล่า|รีสอร์ท|ธรรมชาติ|beach|sea|mountain|camp|hotel|resort/.test(t)) {
+    const pool = [
+      {
+        title: `ช็อตเปิด Hook: เปิดม่าน/เปิดประตูเจอวิวหลักล้านของ${subject}`,
+        angle: 'POV Reveal Shot',
+        angleTh: 'มุมสายตาเดินเปิดประตูเผยวิวสวยเต็มตา (เลนส์ 0.5x)',
+        lens: 'เลนส์ 0.5x Ultra-Wide',
+        movement: 'เดินถือกล้องพุ่งออกไปหาวิว (Forward Reveal)',
+        duration: 2.5,
+        action: `เริ่มจากมุมมืดด้านใน ค่อยๆ เปิดประตูหรือเดินก้าวออกมาเจอวิวธรรมชาติ/วิวของ${subject}แบบเต็มตา แสงแดดและสายลมพัดเข้ามา`,
+        onScreenText: `🌊 เปิดมาเจอวิวแบบนี้ที่ ${subject} คือคุ้มค่าเหนื่อย!`,
+        spaceGuide: '📐 เว้นพื้นที่ช่วงท้องฟ้าด้านบน 30% สำหรับวางพาดหัวใหญ่ดึงดูดสายตา',
+        dialogue: `(น้ำเสียงตื่นเต้น ประทับใจ) "ทุกคนดูวิวตรงหน้านี้สิครับ! วันนี้เราพามาพักผ่อนกันที่ ${subject} บอกเลยว่าของจริงสวยกว่าในรูปสิบเท่า!"`,
+        foley: 'เสียงคลื่นทะเลหรือเสียงลมพัดธรรมชาติ + เพลงเปิดคลิปแนว Travel Vlog',
+        promptEn: `POV wide reveal shot stepping out onto a scenic balcony overlooking breathtaking panoramic view of ${subject}, bright natural sunlight, crystal clear sky, 8k`
+      },
+      {
+        title: `เดินสำรวจบรรยากาศ & สัมผัสธรรมชาติรอบตัว`,
+        angle: 'Wide Establishing Shot',
+        angleTh: 'มุมกว้างถ่ายตัวแบบเดินชมวิวสบายๆ (เลนส์ 0.5x หรือ 1x)',
+        lens: 'เลนส์ 1x มุมปกติ',
+        movement: 'แพนกล้องตามตัวแบบช้าๆ (Slow Tracking Pan)',
+        duration: 3.0,
+        action: `ตั้งกล้องหรือให้เพื่อนเดินถ่ายจากด้านข้าง เห็นตัวแบบกางแขนรับลมหรือเดินเล่นท่ามกลางบรรยากาศสวยๆ ของ${subject}`,
+        onScreenText: `🍃 ทิ้งงานมาชาร์จแบต สูดอากาศเต็มปอด`,
+        spaceGuide: '📐 จัดตัวแบบไว้เส้นตัด 9 ช่องฝั่งซ้าย เว้นพื้นที่วิวฝั่งขวาใส่ข้อความบอกบรรยากาศ',
+        dialogue: `(น้ำเสียงชิลล์ สบายใจ) "อากาศดีมาก ลมพัดเย็นตลอดทั้งวัน เหมาะกับการหนีความวุ่นวายมาพักสมองสุดๆ ครับ"`,
+        foley: 'เสียงธรรมชาติจริงคลอไปกับดนตรีอคูสติกฟังสบาย',
+        promptEn: `Wide cinematic lifestyle shot of a happy traveler walking and enjoying the breeze at ${subject}, lush scenery, golden daylight, 8k`
+      },
+      {
+        title: `เจาะดีเทลมุมพักผ่อน & พร็อพถ่ายรูปเก๋ๆ`,
+        angle: 'Close-up Shot',
+        angleTh: 'มุมใกล้ถ่ายพร็อพ/เครื่องดื่มฉากหลังเป็นวิวสวย (เลนส์ 2x)',
+        lens: 'เลนส์ 2x ละลายฉากหลัง',
+        movement: 'ถือกล้องนิ่งโฟกัสวัตถุด้านหน้า (Rack Focus)',
+        duration: 2.5,
+        action: `วางแก้วเครื่องดื่ม/หมวก/หนังสือ หรือถ่ายมือที่กำลังสัมผัสธรรมชาติ โดยมีวิวสวยๆ ของ${subject}เบลออยู่ด้านหลัง`,
+        onScreenText: `✨ มู้ดดีทุกมุม ถ่ายรูปเพลินมาก`,
+        spaceGuide: '📐 เว้นพื้นที่ด้านบน 25% สำหรับใส่แคปชั่นสั้นๆ สไตล์มินิมอล',
+        dialogue: `(น้ำเสียงอบอุ่น) "ไม่ว่าจะหันไปทางไหนก็มีมุมเก๋ๆ ให้เก็บภาพความประทับใจเพียบเลยครับ"`,
+        foley: 'เสียงลมพัดใบไม้หรือเสียงคลื่นเบาๆ ผ่อนคลาย',
+        promptEn: `Close-up aesthetic lifestyle shot of refreshing drink and travel props in foreground with blurred scenic view of ${subject} in background, warm sunlight, 8k`
+      },
+      {
+        title: `กิจกรรมไฮไลท์สนุกๆ ที่ต้องทำเมื่อมาถึง`,
+        angle: 'Medium Shot',
+        angleTh: 'มุมปานกลางเกาะติดกิจกรรมสนุกๆ (เลนส์ 1x)',
+        lens: 'เลนส์ 1x ระยะสายตา',
+        movement: 'ถือกล้องเคลื่อนตามจังหวะแอคชั่น (Handheld Dynamic)',
+        duration: 3.0,
+        action: `ถ่ายจังหวะกำลังทำกิจกรรมไฮไลท์ของทริป เช่น ลงเล่นน้ำ นั่งชิลล์ริมระเบียง หรือปิกนิกชมวิวด้วยรอยยิ้มสนุกสนาน`,
+        onScreenText: `🔥 ไฮไลท์เด็ดของทริปนี้ ห้ามพลาด!`,
+        spaceGuide: '📐 เว้นพื้นที่ด้านล่าง 20% สำหรับวางซับไตเติลคำบรรยาย',
+        dialogue: `(น้ำเสียงสนุกสนาน มีชีวิตชีวา) "และไฮไลท์ที่พลาดไม่ได้เลยคือมุมนี้ครับ ได้มาใช้เวลาชิลล์ๆ แบบนี้คือมีความสุขมาก"`,
+        foley: 'เสียงหัวเราะสนุกสนานและเพลงจังหวะสดใส',
+        promptEn: `Medium dynamic shot of happy travelers enjoying outdoor activity at ${subject}, genuine laughter, bright sunlit atmosphere, 8k`
+      },
+      {
+        title: `ช็อตแสงเย็น Golden Hour สุดโรแมนติก`,
+        angle: 'Medium Close-up',
+        angleTh: 'มุมย้อนแสงอาทิตย์ตกดิน เห็นแสงริมไลท์สีทอง (เลนส์ 2x)',
+        lens: 'เลนส์ 2x Portrait',
+        movement: 'เคลื่อนกล้องโค้งรอบตัวแบบช้าๆ (Slow Arc)',
+        duration: 3.0,
+        action: `ถ่ายช่วงพระอาทิตย์ใกล้ตกดิน แสงสีส้มทองส่องกระทบเส้นผมและใบหน้า ตัวแบบหันมายิ้มให้กล้องอย่างอบอุ่น`,
+        onScreenText: `🌅 แสงเย็นตอนพระอาทิตย์ตกคือที่สุด!`,
+        spaceGuide: '📐 เว้นพื้นที่ด้านบนศีรษะสำหรับวางข้อความสรุปความประทับใจ',
+        dialogue: `(น้ำเสียงประทับใจ) "ยิ่งช่วงเย็นตอนแสงพระอาทิตย์กำลังจะลับขอบฟ้า โทนสีท้องฟ้าคือสวยโรแมนติกมากจริงๆ ครับ"`,
+        foley: 'เสียงดนตรีท่อนไคลแม็กซ์อบอุ่นกินใจ',
+        promptEn: `Medium close-up portrait at ${subject} during golden hour sunset, warm glowing rim light on hair, serene joyful smile, cinematic 8k`
+      },
+      {
+        title: `สรุปความประทับใจ & ชวนเซฟคลิปตามรอย`,
+        angle: 'Wide Establishing Shot',
+        angleTh: 'มุมกว้างเก็บภาพรวมส่งท้ายทริป (เลนส์ 1x)',
+        lens: 'เลนส์ 1x มุมกว้าง',
+        movement: 'ถือกล้องนิ่งให้ตัวแบบโบกมือลา (Static Outro)',
+        duration: 3.0,
+        action: `ถ่ายภาพมุมกว้างเห็นตัวแบบและวิวสวยๆ ของ${subject} พร้อมขึ้นข้อความสรุปพิกัดและชวนคนดูมาเที่ยวตาม`,
+        onScreenText: `📌 ปักหมุด ${subject} เซฟไว้มาตามรอยกัน!`,
+        spaceGuide: '📐 เว้นพื้นที่กลางค่อนล่างสำหรับใส่ป้ายสรุปพิกัด งบประมาณ และคำแนะนำ',
+        dialogue: `(น้ำเสียงชวนคุย) "เป็นอีกหนึ่งทริปที่ประทับใจสุดๆ ใครอยากมาสัมผัสบรรยากาศแบบนี้ กดเซฟคลิปไว้แล้วแพ็กกระเป๋ามาเที่ยวกันนะครับ!"`,
+        foley: 'เสียงเพลงจบ Fade Out นุ่มนวล',
+        promptEn: `Wide scenic outro shot at ${subject} during twilight, happy traveler waving goodbye to camera, travel vlog finale, 8k`
+      }
+    ];
+    return selectEvenly(pool, targetCount);
+  }
+
+  // 4. Universal Travel / Vlog / Content Story Arc (ใช้ได้กับทุกโจทย์ที่โยนเข้ามา เชื่อมโยงชื่อเรื่องทุกฉาก!)
+  const universalPool = [
+    {
+      title: `ช็อตเปิด Hook: ดึงสายตาเข้าสู่ ${subject}`,
+      angle: 'Low Angle Hero Shot',
+      angleTh: 'มุมกว้างเชิดขึ้นเล็กน้อยเห็นทั้งคนและสถานที่ (เลนส์ 0.5x)',
+      lens: 'เลนส์ 0.5x Ultra-Wide',
+      movement: 'เดินถือกล้องดันเข้าหาตัวแบบช้าๆ (Slow Push-In)',
+      duration: 2.5,
+      action: `เริ่มต้นหน้าจุดเด่นที่สุดของ "${subject}" ให้ตัวแบบหันมาสบตากล้องด้วยท่าทางตื่นเต้นแล้วผายมือชวนเข้าสู่ฉาก`,
+      onScreenText: `🔥 พาบุก ${subject}! จะเด็ดแค่ไหนมาดูกัน`,
+      spaceGuide: '📐 เว้นพื้นที่ว่างด้านบน 30% (เหนือศีรษะ) สำหรับวางพาดหัว Hook ขนาดใหญ่ไม่ให้บังหน้าคนพูด',
+      dialogue: `(น้ำเสียงตื่นเต้น ดึงดูดคนดูใน 3 วิแรก) "ทุกคนครับ! วันนี้เรามาอยู่กันที่ ${subject} ที่หลายคนถามหากันเข้ามาเยอะมาก ตามมาดูกันเลยว่าของจริงจะเด็ดขนาดไหน!"`,
+      foley: 'เสียงเอฟเฟกต์ Whoosh เปิดคลิป + เพลงจังหวะสนุกชวนติดตาม',
+      promptEn: `Dynamic wide establishing hook shot featuring ${subject}, enthusiastic presenter welcoming viewers into the scene, bright natural lighting, commercial vlog style, 8k`
+    },
+    {
+      title: `พาเดินเข้าสู่บรรยากาศจริงของ ${subject}`,
+      angle: 'Over-the-Shoulder Shot',
+      angleTh: 'มุมมองเดินตามหลัง พาคนดูเข้าสู่สถานที่ (เลนส์ 1x)',
+      lens: 'เลนส์ 1x มุมปกติ',
+      movement: 'เดินถือกล้องตามหลังนิ่งๆ (Smooth Walk Follow)',
+      duration: 3.0,
+      action: `ถือกล้องเดินตามหลังตัวแบบก้าวเข้าสู่พื้นที่หลักของ "${subject}" แพนกล้องให้เห็นบรรยากาศรอบข้างที่คึกคักหรือสวยงาม`,
+      onScreenText: `✨ บรรยากาศจริง มู้ดดีตั้งแต่ก้าวแรก`,
+      spaceGuide: '📐 จัดตัวแบบไว้ฝั่งซ้ายของจอ เว้นพื้นที่ฝั่งขวาสำหรับใส่ป้ายบอกพิกัดหรือเวลา',
+      dialogue: `(น้ำเสียงเล่าเรื่องเป็นกันเอง) "พอเดินเข้ามาข้างใน บรรยากาศจริงคือดีมากครับ มีมุมน่าสนใจให้เราแวะชมตลอดทางเลย"`,
+      foley: 'เสียงบรรยากาศสถานที่จริง (Ambient) เบาๆ คลอกับเสียงเพลง',
+      promptEn: `Smooth over-the-shoulder tracking shot following traveler exploring ${subject}, rich environmental details, warm natural daylight, cinematic 8k`
+    },
+    {
+      title: `เจาะจุดไฮไลท์อันดับ 1 ที่ห้ามพลาด`,
+      angle: 'Medium Shot',
+      angleTh: 'มุมปานกลางระดับสายตา โฟกัสจุดไฮไลท์ (เลนส์ 1x)',
+      lens: 'เลนส์ 1x ระยะสายตา',
+      movement: 'แพนกล้องจากจุดเด่นมาหาตัวแบบ (Pan Reveal)',
+      duration: 3.0,
+      action: `ถ่ายจุดไฮไลท์สำคัญของ "${subject}" ให้เห็นชัดๆ เต็มเฟรม แล้วแพนกล้องมาที่ตัวแบบซึ่งกำลังทำกิจกรรมหรือชี้ให้ดูจุดเด่น`,
+      onScreenText: `⭐ ไฮไลท์เด็ดประจำทริปที่ต้องมาโดน!`,
+      spaceGuide: '📐 โฟกัสจุดเด่นกลางจอ เว้นพื้นที่ด้านล่าง 20% สำหรับวางซับไตเติลบรรยาย',
+      dialogue: `(น้ำเสียงเน้นจังหวะสำคัญ) "และจุดไฮไลท์ที่ทุกคนต้องแวะเมื่อมาถึง ${subject} ก็คือตรงนี้เลยครับ เป็นซิกเนเจอร์ที่คุ้มค่ากับการมามากๆ"`,
+      foley: 'เสียงเอฟเฟกต์ Pop สดใสเน้นจุดไฮไลท์',
+      promptEn: `Medium shot showcasing the main highlight of ${subject}, vibrant colors, crisp focus, engaging lifestyle presentation, 8k`
+    },
+    {
+      title: `ซูมเจาะดีเทลใกล้ๆ เพิ่มมิติให้ภาพดูโปร`,
+      angle: 'Extreme Close-up / Macro',
+      angleTh: 'มุมใกล้เจาะรายละเอียด ละลายฉากหลัง (เลนส์ 2x)',
+      lens: 'เลนส์ 2x Tele / Macro',
+      movement: 'เลื่อนกล้องช้าๆ จากซ้ายไปขวา (Slow Slider)',
+      duration: 2.5,
+      action: `สลับมาถ่ายมุมใกล้ (Close-up) เจาะรายละเอียดสิ่งของ อาหาร งานฝีมือ หรือการสัมผัสใกล้ๆ ใน "${subject}" เพื่อตัดจังหวะให้คลิปไม่น่าเบื่อ`,
+      onScreenText: `🔍 ดีเทลใกล้ๆ สวยคมชัดทุกมุม`,
+      spaceGuide: '📐 เว้นขอบบนของเฟรม 20% สำหรับใส่ข้อความสั้นๆ อธิบายจุดเด่น',
+      dialogue: `(น้ำเสียงชื่นชม) "ลองดูรายละเอียดใกล้ๆ สิครับ พอถ่ายเจาะมุมนี้ยิ่งเห็นความพิเศษชัดเจนเลย"`,
+      foley: 'เสียง ASMR สัมผัสหรือเสียงบรรยากาศใกล้ๆ คมชัด',
+      promptEn: `Extreme close-up macro detail shot capturing fine textures and highlights of ${subject}, shallow depth of field with creamy bokeh, 8k`
+    },
+    {
+      title: `โมเมนต์ความประทับใจ & มุมถ่ายรูปเช็กอิน`,
+      angle: 'Medium Close-up',
+      angleTh: 'มุมครึ่งตัวเห็นรอยยิ้มและฉากหลังสวยๆ (เลนส์ 1x หรือ 2x)',
+      lens: 'เลนส์ 1x หรือ 2x',
+      movement: 'ถือกล้องนิ่งโฟกัสรอยยิ้มตัวแบบ (Static Portrait)',
+      duration: 3.0,
+      action: `ถ่ายตัวแบบในมุมที่แสงสวยที่สุดของ "${subject}" ยิ้มอย่างมีความสุขและแสดงความรู้สึกประทับใจแบบธรรมชาติ`,
+      onScreenText: `😍 ประทับใจสุดๆ ได้รูปสวยกลับบ้านเพียบ`,
+      spaceGuide: '📐 จัดใบหน้าอยู่กึ่งกลางค่อนบน เว้นช่วงอกลงมาสำหรับวางซับไตเติล',
+      dialogue: `(น้ำเสียงอบอุ่น จริงใจ) "บอกเลยว่ามาที่นี่นอกจากจะได้ความสุขกลับไปแล้ว ยังได้รูปสวยๆ กลับไปอัปลงโซเชียลเพียบเลยครับ"`,
+      foley: 'เสียงชัตเตอร์กล้องถ่ายรูป + ดนตรีฟีลกู๊ด',
+      promptEn: `Medium close-up portrait of a smiling happy creator enjoying the moment at ${subject}, warm golden sunlight, authentic lifestyle photography, 8k`
+    },
+    {
+      title: `สรุปความคุ้มค่า & ชวนคนดูกดเซฟตามรอย`,
+      angle: 'Wide Establishing Shot',
+      angleTh: 'มุมกว้างเก็บภาพรวมส่งท้าย + ชวนคอมเมนต์ (เลนส์ 1x)',
+      lens: 'เลนส์ 1x มุมกว้าง',
+      movement: 'ค่อยๆ ถอยกล้องออกช้าๆ (Slow Pull-Out)',
+      duration: 3.0,
+      action: `ถ่ายมุมกว้างเห็นภาพรวมของ "${subject}" ตัวแบบหันมายิ้มโบกมือลาและชี้ชวนให้คนดูกดเซฟหรือแชร์คลิปนี้`,
+      onScreenText: `📌 กดเซฟคลิปไว้ตามรอย ${subject} ได้เลย!`,
+      spaceGuide: '📐 เว้นพื้นที่ว่างด้านล่าง 25% สำหรับใส่กรอบสรุปพิกัด งบประมาณ และชวนกดติดตาม',
+      dialogue: `(น้ำเสียงชวนติดตาม) "ใครที่กำลังวางแพลนอยู่ กดเซฟคลิปนี้เก็บไว้ แล้วชวนเพื่อนหรือคนรู้ใจมาตามรอยที่ ${subject} กันได้เลยนะครับ!"`,
+      foley: 'เพลงประกอบท่อนจบชัดเจน ประทับใจ',
+      promptEn: `Wide cinematic outro shot at ${subject}, cheerful presenter waving and smiling at camera, warm sunset lighting, 8k`
+    }
+  ];
+
+  // If user requested more than 6 shots (up to 12), expand with intermediate discovery beats
+  if (targetCount > universalPool.length) {
+    const extraPool = [
+      universalPool[0],
+      universalPool[1],
+      {
+        ...universalPool[2],
+        title: `สำรวจมุมแรกที่น่าตื่นตาตื่นใจของ ${subject}`,
+        onScreenText: `✨ จุดเช็กอินที่ 1 ที่ต้องแวะชม`,
+        dialogue: `(น้ำเสียงกระตือรือร้น) "จุดแรกที่เราแวะมาดูกัน บอกเลยว่าโดดเด่นสะดุดตาตั้งแต่เดินเข้ามาเลยครับ"`
+      },
+      universalPool[3],
+      universalPool[2],
+      {
+        ...universalPool[3],
+        title: `มุมมองจากอีกฝั่ง เก็บภาพบรรยากาศกว้างๆ`,
+        angle: 'High Angle / Bird Eye',
+        angleTh: 'มุมสูงเห็นภาพรวมมุมกว้าง (เลนส์ 0.5x)',
+        onScreenText: `📸 มุมสูงเห็นวิวครบทุกมิติ`,
+        dialogue: `(น้ำเสียงเพลิดเพลิน) "พอมองจากมุมนี้ จะเห็นภาพรวมที่สวยงามลงตัวมากๆ ครับ"`
+      },
+      universalPool[4],
+      universalPool[5]
+    ];
+    return selectEvenly(extraPool, targetCount);
+  }
+
+  return selectEvenly(universalPool, targetCount);
+}
+
+function selectEvenly(pool, count) {
+  if (count <= 1) return [pool[0]];
+  if (count >= pool.length) {
+    const res = [...pool];
+    while (res.length < count) {
+      const idx = res.length + 1;
+      const base = pool[(res.length) % pool.length];
+      res.push({
+        ...base,
+        title: `${base.title} (มุมเสริมที่ ${idx})`
+      });
+    }
+    return res;
+  }
+  const result = [];
+  for (let i = 0; i < count; i++) {
+    const idx = Math.round((i * (pool.length - 1)) / (count - 1));
+    result.push(pool[idx]);
+  }
+  return result;
+}
+
+/**
+ * Enrich an individual beat (when user provides explicit numbered steps or scenes)
+ */
+function enrichSingleBeat(projectTitle, beatText, index, totalShots, visualStyleEn) {
+  const roleInfo = getShotNarrativeRole(index, totalShots);
+  const cleanBeat = String(beatText || '').replace(/^(?:ฉากที่|ช็อตที่|Scene|Shot)\s*\d+[:\s.-]*/i, '').trim();
+  const cleanTitle = extractCleanSubject(projectTitle);
+
+  // Choose varied camera angle across shots so it's never monotonous
+  const cameraRotation = [
+    { angle: 'Wide Establishing Shot', angleTh: 'มุมกว้างเปิดฉากเห็นสถานที่ (เลนส์ 0.5x)', lens: 'เลนส์ 0.5x Ultra-Wide', movement: 'เดินถือกล้องดันเข้าช้าๆ (Slow Push-In)' },
+    { angle: 'Medium Shot', angleTh: 'มุมปานกลางระดับสายตาเล่าเรื่อง (เลนส์ 1x)', lens: 'เลนส์ 1x ระยะสายตา', movement: 'ถือกล้องเดินตามนุ่มนวล (Smooth Follow)' },
+    { angle: 'Close-up Shot', angleTh: 'มุมใกล้โฟกัสจุดเด่นชัดๆ (เลนส์ 2x)', lens: 'เลนส์ 2x ละลายหลัง', movement: 'ถือกล้องนิ่งโฟกัสจุดสำคัญ (Static Focus)' },
+    { angle: 'Extreme Close-up / Macro', angleTh: 'มุมมาโครเจาะดีเทลใกล้พิเศษ (เลนส์ 2x)', lens: 'เลนส์ 2x Macro', movement: 'เลื่อนกล้องช้าๆ ด้านข้าง (Slow Slide)' },
+    { angle: 'Low Angle Hero Shot', angleTh: 'มุมเสยต่ำเพิ่มความอลังการ (เลนส์ 0.5x/1x)', lens: 'เลนส์ 1x มุมต่ำ', movement: 'แพนกล้องเชิดขึ้นช้าๆ (Slow Tilt Up)' },
+    { angle: 'Over-the-Shoulder Shot', angleTh: 'มุมมองข้ามไหล่พาคนดูมีส่วนร่วม (เลนส์ 1x)', lens: 'เลนส์ 1x มุมปกติ', movement: 'เดินตามหลังตัวแบบ (Walk-With)' }
+  ];
+
+  // Infer camera angle from keywords in beatText if mentioned, else rotate smartly
+  let cam = cameraRotation[index % cameraRotation.length];
+  const lower = cleanBeat.toLowerCase();
+  if (/มาโคร|macro|ใกล้มาก|extreme close/.test(lower)) cam = cameraRotation[3];
+  else if (/โคลสอัพ|close-up|มุมใกล้|ใบหน้า|มือ/.test(lower)) cam = cameraRotation[2];
+  else if (/มุมกว้าง|wide|เปิดตัว|ทั้งร้าน|วิว/.test(lower)) cam = cameraRotation[0];
+  else if (/มุมต่ำ|low angle|เสย/.test(lower)) cam = cameraRotation[4];
+  else if (/ตามหลัง|ข้ามไหล่|เดินเข้า/.test(lower)) cam = cameraRotation[5];
+
+  // Craft connected voiceover based on position in story
+  let dialogue = '';
+  if (index === 0) {
+    dialogue = `(น้ำเสียงตื่นเต้น เปิดคลิปดึงคนดู) "ทุกคนครับ! วันนี้พามาที่ ${cleanTitle} เริ่มกันที่ช็อตแรก ${cleanBeat} บอกเลยว่าห้ามพลาด!"`;
+  } else if (index === totalShots - 1) {
+    dialogue = `(น้ำเสียงประทับใจ ชวนกดเซฟ) "ปิดท้ายด้วย ${cleanBeat} เป็นทริปที่คุ้มค่ามาก ใครชอบแนวนี้กดเซฟคลิปไว้ตามรอยได้เลยครับ!"`;
+  } else if (index === 1) {
+    dialogue = `(น้ำเสียงเล่าเรื่องสนุกๆ) "พอเข้ามาถึง เราก็เริ่มด้วย ${cleanBeat} บรรยากาศจริงคือดีงามมากครับ"`;
+  } else {
+    dialogue = `(น้ำเสียงเพลิดเพลิน) "ไปต่อกันที่ไฮไลท์ช็อตนี้เลยครับ ${cleanBeat} มุมนี้ถ่ายออกมาแล้วสวยลงตัวสุดๆ"`;
+  }
+
+  const onScreenText = index === 0
+    ? `🔥 ${cleanBeat.slice(0, 32)}`
+    : index === totalShots - 1
+    ? `📌 พิกัด: ${cleanTitle.slice(0, 28)} (เซฟไว้เลย!)`
+    : `✨ ${cleanBeat.slice(0, 34)}`;
+
+  const actionTh = `ถ่ายช็อต "${cleanBeat}" โดยใช้${cam.angleTh} (${cam.movement}) ให้เห็นแอคชั่นและอารมณ์ในฉากชัดเจน`;
+  const foley = index === 0
+    ? 'เสียงเอฟเฟกต์เปิดคลิป + เพลงจังหวะสนุกดึงดูดสายตา'
+    : 'เสียงบรรยากาศจริงในฉาก (Ambient) คลอไปกับเพลงประกอบ';
+
+  const promptEn = `${cam.angle}, ${cleanBeat} (${cleanTitle}), ${visualStyleEn || 'natural daylight, high-end travel lifestyle photography'}, hyper-realistic, crisp details, 8k`;
+  const videoPrompt = `[Camera: ${cam.movement}] [Shot: ${cam.angle}] [Action: ${cleanBeat}] [Style: ${visualStyleEn || 'cinematic'}], smooth 60fps motion, 8k`;
 
   return {
-    camera_angle: angle,
-    camera_angle_th: angleTh,
-    camera_movement: movement,
-    lens_focal: lens,
+    shot_role: roleInfo.role,
+    duration_seconds: roleInfo.defaultDuration,
+    camera_angle: cam.angle,
+    camera_angle_th: cam.angleTh,
+    camera_movement: cam.movement,
+    lens_focal: cam.lens,
     action_description: actionTh,
     dialogue: dialogue,
     audio_foley: foley,
-    prompt: finalPrompt,
+    on_screen_text: onScreenText,
+    live_action_guide: roleInfo.textSafeZone,
+    prompt: promptEn,
     video_prompt: videoPrompt
   };
 }
 
 /**
- * Universal Multi-Scene Script Parser
+ * Parse structured multi-scene script when user explicitly numbers scenes (1..N or Scene 1..N)
  */
 function parseMultiSceneScript(rawText) {
   if (!rawText || typeof rawText !== 'string' || !rawText.trim()) {
@@ -303,22 +595,18 @@ function parseMultiSceneScript(rawText) {
   let projectTitle = '';
   const titleMatch = text.match(/^[🎬🎥\s]*(?:(?:Prompt|Content|คอนเทนต์|บท|สคริปต์)\s*\d*\s*[:：]|(?:Title|เรื่อง|ชื่อเรื่อง)\s*[:：])\s*([^\n\r]+)/im);
   if (titleMatch) {
-    let rawTitle = titleMatch[1].trim();
-    rawTitle = rawTitle.replace(/Visual\s*Style.*$/i, '').replace(/["“”]/g, '').trim();
+    let rawTitle = titleMatch[1].trim().replace(/Visual\s*Style.*$/i, '').replace(/["“”]/g, '').trim();
     if (rawTitle.length >= 2) projectTitle = rawTitle;
-  } else {
-    // If first line doesn't start with Scene/Shot/Number, use first line as title
-    if (lines[0] && !/^(?:Scene|Shot|ฉาก|ช็อต|ซีน|\d+[\.\)])/i.test(lines[0])) {
-      projectTitle = lines[0].replace(/^[🎬🎥\s*#*-]+/, '').replace(/Visual\s*Style.*$/i, '').replace(/["“”]/g, '').trim();
-    }
+  } else if (lines[0] && !/^(?:Scene|Shot|ฉาก|ช็อต|ซีน|\d+[\.\)])/i.test(lines[0])) {
+    projectTitle = lines[0].replace(/^[🎬🎥\s*#*-]+/, '').replace(/Visual\s*Style.*$/i, '').replace(/["“”]/g, '').trim();
   }
   if (!projectTitle || projectTitle.length < 2) {
-    projectTitle = 'โปรเจกต์สตอรี่บอร์ดงานภาพยนตร์';
+    projectTitle = 'สตอรี่บอร์ดคอนเทนต์พร้อมถ่าย';
   }
 
   // 2. Detect Visual Style
-  let visualStyle = 'ภาพยนตร์พรีเมียม (Macro Cinematic Commercial)';
-  let visualStyleEn = 'cinematic commercial lighting, natural volumetric light, shallow depth of field, photorealistic 8k';
+  let visualStyle = 'แสงธรรมชาติคมชัด สไตล์ครีเอเตอร์มืออาชีพ';
+  let visualStyleEn = 'natural volumetric daylight, shallow depth of field, photorealistic lifestyle commercial 8k';
   const styleMatch = text.match(/Visual\s*Style(?:[^\n:：]*?)?[:：]\s*([^\n\r]+)/i);
   if (styleMatch) {
     let s = styleMatch[1].trim().replace(/(?:Scene|Shot|ฉาก).*$/i, '').trim();
@@ -330,7 +618,6 @@ function parseMultiSceneScript(rawText) {
 
   // 3. Split by Scene / Shot headers
   const sceneHeaderRegex = /(?:^|\n)\s*(?:(?:Scene|Shot|ฉากที่|ฉาก|ช็อตที่|ช็อต|ซีน)\s*(\d+)[\s:：.-]*([^\n]*)|(\d+)[.)]\s*([^\n]+))/gi;
-
   const headerMatches = [];
   let m;
   while ((m = sceneHeaderRegex.exec(text)) !== null) {
@@ -343,79 +630,76 @@ function parseMultiSceneScript(rawText) {
     });
   }
 
-  const parsedShots = [];
-
-  if (headerMatches.length > 0) {
-    for (let i = 0; i < headerMatches.length; i++) {
-      const current = headerMatches[i];
-      const startIdx = current.index;
-      const endIdx = (i + 1 < headerMatches.length) ? headerMatches[i + 1].index : text.length;
-      const blockText = text.substring(startIdx, endIdx).trim();
-
-      const blockLines = blockText.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
-      const contentLines = blockLines.slice(1);
-
-      let shotPrompt = '';
-      let foleyDesc = '';
-      let dialogueText = '';
-
-      // Check for explicit "Prompt: ..."
-      const promptIdx = contentLines.findIndex(l => /^Prompt\s*:\s*/i.test(l));
-      if (promptIdx !== -1) {
-        shotPrompt = contentLines[promptIdx].replace(/^Prompt\s*:\s*/i, '').trim();
-        for (let j = promptIdx + 1; j < contentLines.length; j++) {
-          if (/^(?:Audio|Foley|Camera|Dialogue|Text|ซาวด์|เสียง|มุมกล้อง)\s*:/i.test(contentLines[j])) break;
-          shotPrompt += ' ' + contentLines[j];
-        }
-      } else if (contentLines.length > 0) {
-        shotPrompt = contentLines.join(' ').trim();
-      } else {
-        shotPrompt = current.title;
-      }
-
-      // Check for Audio / Foley
-      const audioLine = contentLines.find(l => /^(?:Audio|Foley|Sound|เสียง|ซาวด์)\s*:/i.test(l));
-      if (audioLine) {
-        foleyDesc = audioLine.replace(/^(?:Audio|Foley|Sound|เสียง|ซาวด์)\s*:\s*/i, '').trim();
-      }
-
-      // Check for Dialogue
-      const dialogueLine = contentLines.find(l => /^(?:Dialogue|บทพูด|เสียงพากย์)\s*:/i.test(l));
-      if (dialogueLine) {
-        dialogueText = dialogueLine.replace(/^(?:Dialogue|บทพูด|เสียงพากย์)\s*:\s*/i, '').trim();
-      }
-
-      const beatSubject = current.title || shotPrompt;
-      const enriched = enrichSingleBeat(projectTitle, beatSubject, i, headerMatches.length, visualStyleEn);
-
-      const shotNumber = current.sceneNum || (i + 1);
-      const titleClean = current.title ? `ฉากที่ ${shotNumber}: ${current.title}` : `ฉากที่ ${shotNumber}`;
-
-      parsedShots.push({
-        shot_number: shotNumber,
-        scene_number: shotNumber,
-        scene_title: titleClean,
-        title: titleClean,
-        subtitle: `${enriched.camera_angle_th} • ${enriched.lens_focal}`,
-        camera_angle: enriched.camera_angle,
-        camera_angle_th: enriched.camera_angle_th,
-        camera_movement: enriched.camera_movement,
-        lens_focal: enriched.lens_focal,
-        duration_seconds: 3.0,
-        action_description: enriched.action_description,
-        dialogue: dialogueText || enriched.dialogue,
-        audio_foley: foleyDesc || enriched.audio_foley,
-        on_screen_text: shotNumber === headerMatches.length ? projectTitle.slice(0, 35) : '',
-        prompt: enriched.prompt,
-        video_prompt: enriched.video_prompt,
-        live_action_guide: `มุมกล้อง: ${enriched.camera_angle} | เลนส์: ${enriched.lens_focal} | จัดแสงธรรมชาติเน้นมิติความลึก (Depth of Field)`,
-        visual_style: visualStyle,
-        aspect_ratio: '16:9'
-      });
-    }
+  if (headerMatches.length < 2) {
+    return null;
   }
 
-  // Calculate timecodes
+  const parsedShots = [];
+  for (let i = 0; i < headerMatches.length; i++) {
+    const current = headerMatches[i];
+    const startIdx = current.index;
+    const endIdx = (i + 1 < headerMatches.length) ? headerMatches[i + 1].index : text.length;
+    const blockText = text.substring(startIdx, endIdx).trim();
+
+    const blockLines = blockText.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+    const contentLines = blockLines.slice(1);
+
+    let shotPrompt = '';
+    let foleyDesc = '';
+    let dialogueText = '';
+
+    const promptIdx = contentLines.findIndex(l => /^Prompt\s*:\s*/i.test(l));
+    if (promptIdx !== -1) {
+      shotPrompt = contentLines[promptIdx].replace(/^Prompt\s*:\s*/i, '').trim();
+      for (let j = promptIdx + 1; j < contentLines.length; j++) {
+        if (/^(?:Audio|Foley|Camera|Dialogue|Text|ซาวด์|เสียง|มุมกล้อง)\s*:/i.test(contentLines[j])) break;
+        shotPrompt += ' ' + contentLines[j];
+      }
+    } else if (contentLines.length > 0) {
+      shotPrompt = contentLines.join(' ').trim();
+    } else {
+      shotPrompt = current.title;
+    }
+
+    const audioLine = contentLines.find(l => /^(?:Audio|Foley|Sound|เสียง|ซาวด์)\s*:/i.test(l));
+    if (audioLine) {
+      foleyDesc = audioLine.replace(/^(?:Audio|Foley|Sound|เสียง|ซาวด์)\s*:\s*/i, '').trim();
+    }
+
+    const dialogueLine = contentLines.find(l => /^(?:Dialogue|บทพูด|เสียงพากย์)\s*:/i.test(l));
+    if (dialogueLine) {
+      dialogueText = dialogueLine.replace(/^(?:Dialogue|บทพูด|เสียงพากย์)\s*:\s*/i, '').trim();
+    }
+
+    const beatSubject = current.title || shotPrompt;
+    const enriched = enrichSingleBeat(projectTitle, beatSubject, i, headerMatches.length, visualStyleEn);
+    const shotNumber = current.sceneNum || (i + 1);
+    const titleClean = current.title ? `ฉากที่ ${shotNumber}: ${current.title}` : `ฉากที่ ${shotNumber}`;
+
+    parsedShots.push({
+      shot_number: shotNumber,
+      scene_number: shotNumber,
+      scene_title: enriched.shot_role,
+      shot_role: enriched.shot_role,
+      title: titleClean,
+      subtitle: `${enriched.camera_angle_th} • ${enriched.lens_focal}`,
+      camera_angle: enriched.camera_angle,
+      camera_angle_th: enriched.camera_angle_th,
+      camera_movement: enriched.camera_movement,
+      lens_focal: enriched.lens_focal,
+      duration_seconds: enriched.duration_seconds,
+      action_description: enriched.action_description,
+      dialogue: dialogueText || enriched.dialogue,
+      audio_foley: foleyDesc || enriched.audio_foley,
+      on_screen_text: enriched.on_screen_text,
+      live_action_guide: enriched.live_action_guide,
+      prompt: shotPrompt && !/[\u0E00-\u0E7F]/.test(shotPrompt) ? `${shotPrompt}, ${visualStyleEn}` : enriched.prompt,
+      video_prompt: enriched.video_prompt,
+      visual_style: visualStyle,
+      aspect_ratio: '9:16'
+    });
+  }
+
   let curTime = 0;
   parsedShots.forEach((s) => {
     const startSec = curTime;
@@ -423,8 +707,8 @@ function parseMultiSceneScript(rawText) {
     curTime = endSec;
     const formatSec = (seconds) => {
       const mins = Math.floor(seconds / 60);
-      const s = seconds % 60;
-      const sStr = s < 10 ? '0' + s.toFixed(1) : s.toFixed(1);
+      const sec = seconds % 60;
+      const sStr = sec < 10 ? '0' + sec.toFixed(1) : sec.toFixed(1);
       return `${mins}:${sStr}`;
     };
     s.timecode = `${formatSec(startSec)} - ${formatSec(endSec)}`;
@@ -442,5 +726,8 @@ function parseMultiSceneScript(rawText) {
 module.exports = {
   parseMultiSceneScript,
   normalizeScriptText,
-  enrichSingleBeat
+  enrichSingleBeat,
+  buildConnectedStoryBeats,
+  getShotNarrativeRole,
+  extractCleanSubject
 };

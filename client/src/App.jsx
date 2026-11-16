@@ -102,7 +102,7 @@ export default function App() {
     setActiveView('board');
   };
 
-  // Render a single shot's AI image via FLUX.1
+  // Render a single shot's AI image
   const handleRenderShotImage = async (shotId, customPrompt) => {
     if (!shotId) return null;
     setRenderingIds((prev) => ({ ...prev, [shotId]: true }));
@@ -111,7 +111,6 @@ export default function App() {
       const targetShot = prompts.find((p) => p.id === shotId);
       const promptToUse = customPrompt || targetShot?.content || targetShot?.title || '';
 
-      // Also persist the updated prompt if the user edited it
       if (customPrompt && targetShot && customPrompt !== targetShot.content) {
         await fetch(`/api/prompts/${shotId}`, {
           method: 'PUT',
@@ -125,7 +124,7 @@ export default function App() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           prompt: promptToUse,
-          aspect_ratio: targetShot?.aspect_ratio || '16:9'
+          aspect_ratio: targetShot?.aspect_ratio || '9:16'
         })
       });
       const data = await res.json();
@@ -147,7 +146,7 @@ export default function App() {
     return null;
   };
 
-  // Sequentially render FLUX.1 AI images for a list of shots
+  // Sequentially render AI images for a list of shots
   const runBatchImageRender = async (shotsList, onlyMissing = false) => {
     const targets = onlyMissing
       ? shotsList.filter(
@@ -175,7 +174,7 @@ export default function App() {
     await fetchSeries();
   };
 
-  // Option 1: Plan Storyboard -> Commit to Board -> Auto-Render Real FLUX.1 Images Immediately
+  // Option 1: Plan Storyboard -> Commit to Board -> Optionally Auto-Render Real AI Images
   const handlePlanAndAutoRender = async (payload) => {
     setIsPlanning(true);
     setPreCommitDraft(null);
@@ -187,7 +186,7 @@ export default function App() {
       });
       const planJson = await planRes.json();
       if (!planJson.success || !planJson.data?.shots) {
-        alert(planJson.error || 'ไม่สามารถแตกช็อตได้ กรุณาลองใหม่อีกครั้งครับ');
+        alert(planJson.error || 'ไม่สามารถวางแผนฉากได้ กรุณาลองใหม่อีกครั้งครับ');
         return;
       }
 
@@ -200,7 +199,7 @@ export default function App() {
           visual_style: payload.visual_style,
           target_duration: planData.target_duration || payload.target_duration,
           pacing: payload.pacing || 'normal',
-          aspect_ratio: payload.aspect_ratio || '16:9',
+          aspect_ratio: payload.aspect_ratio || '9:16',
           shots: planData.shots
         })
       });
@@ -209,16 +208,26 @@ export default function App() {
         const newSeriesId = commitJson.series_id;
         await fetchSeries();
         setSelectedSeriesId(newSeriesId);
-        localStorage.setItem('cineboard_active_series', newSeriesId);
+        try {
+          localStorage.setItem('cineboard_active_series', newSeriesId);
+          localStorage.removeItem('cineboard_draft_concept');
+        } catch (_) {}
+
         setPrompts(commitJson.data);
         setActiveView('board');
+
+        // On mobile screen, auto-collapse sidebar so user immediately sees their storyboard!
+        if (typeof window !== 'undefined' && window.innerWidth < 1024) {
+          setSidebarOpen(false);
+        }
 
         try {
           confetti({ particleCount: 45, spread: 60, origin: { y: 0.6 } });
         } catch (_) {}
 
-        // Immediately start rendering real FLUX.1 AI images for all created shots!
-        runBatchImageRender(commitJson.data, false);
+        if (payload.auto_render_images !== false) {
+          runBatchImageRender(commitJson.data, false);
+        }
       }
     } catch (err) {
       console.error('Plan and auto render error:', err);
@@ -227,7 +236,7 @@ export default function App() {
     }
   };
 
-  // Option 2: Plan Storyboard -> Open in Bulk Prompt Editor BEFORE Committing/Rendering
+  // Option 2: Plan Storyboard -> Open in Bulk Editor BEFORE Committing/Rendering
   const handlePlanForReview = async (payload) => {
     setIsPlanning(true);
     try {
@@ -238,7 +247,7 @@ export default function App() {
       });
       const planJson = await planRes.json();
       if (!planJson.success || !planJson.data?.shots) {
-        alert(planJson.error || 'ไม่สามารถแตกช็อตได้ กรุณาลองใหม่อีกครั้งครับ');
+        alert(planJson.error || 'ไม่สามารถวางแผนฉากได้ กรุณาลองใหม่อีกครั้งครับ');
         return;
       }
 
@@ -246,10 +255,13 @@ export default function App() {
         project_title: planJson.data.project_title,
         visual_style: payload.visual_style,
         target_duration: planJson.data.target_duration || payload.target_duration,
-        aspect_ratio: payload.aspect_ratio || '16:9',
+        aspect_ratio: payload.aspect_ratio || '9:16',
         shots: planJson.data.shots
       });
       setActiveView('bulk_editor');
+      if (typeof window !== 'undefined' && window.innerWidth < 1024) {
+        setSidebarOpen(false);
+      }
     } catch (err) {
       console.error('Plan for review error:', err);
     } finally {
@@ -257,7 +269,7 @@ export default function App() {
     }
   };
 
-  // Commit reviewed draft from Bulk Editor (and optionally auto-render all images)
+  // Commit reviewed draft from Bulk Editor
   const handleCommitDraftAndRender = async (draftPayload, shouldRenderAll = true) => {
     try {
       const commitRes = await fetch('/api/storyboard/commit-shots', {
@@ -265,9 +277,9 @@ export default function App() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           project_title: draftPayload.project_title,
-          visual_style: draftPayload.visual_style || 'Commercial Luxury',
-          target_duration: draftPayload.target_duration || 30,
-          aspect_ratio: draftPayload.aspect_ratio || '16:9',
+          visual_style: draftPayload.visual_style || 'แสงธรรมชาติคมชัด',
+          target_duration: draftPayload.target_duration || 20,
+          aspect_ratio: draftPayload.aspect_ratio || '9:16',
           shots: draftPayload.shots
         })
       });
@@ -277,7 +289,10 @@ export default function App() {
         const newSeriesId = commitJson.series_id;
         await fetchSeries();
         setSelectedSeriesId(newSeriesId);
-        localStorage.setItem('cineboard_active_series', newSeriesId);
+        try {
+          localStorage.setItem('cineboard_active_series', newSeriesId);
+          localStorage.removeItem('cineboard_draft_concept');
+        } catch (_) {}
         setPrompts(commitJson.data);
         setActiveView('board');
 
@@ -308,7 +323,6 @@ export default function App() {
 
   // Save Bulk Edits for an existing board
   const handleSaveBulkEdits = async (editedShots) => {
-    // Handle any newly added rows vs existing rows
     const existingUpdates = [];
     for (const s of editedShots) {
       if (s.isNew) {
@@ -319,12 +333,16 @@ export default function App() {
             series_id: selectedSeriesId,
             shot: {
               title: s.title,
+              shot_role: s.shot_role,
               camera_angle: s.camera_angle,
+              camera_movement: s.camera_movement,
               duration_seconds: s.duration_seconds,
               action_description: s.action_description,
+              on_screen_text: s.on_screen_text,
+              live_action_guide: s.live_action_guide,
               dialogue: s.dialogue_script,
               prompt: s.content,
-              aspect_ratio: s.aspect_ratio || '16:9'
+              aspect_ratio: s.aspect_ratio || '9:16'
             }
           })
         });
@@ -341,7 +359,6 @@ export default function App() {
       });
     }
 
-    // Delete any shots that were removed in bulk editor
     const keptIds = new Set(existingUpdates.map((u) => u.id));
     for (const oldShot of prompts) {
       if (!keptIds.has(oldShot.id)) {
@@ -381,10 +398,14 @@ export default function App() {
           series_id: targetSeries,
           shot: {
             title: `ฉากเพิ่มเติมที่ ${prompts.length + 1}`,
+            shot_role: '✨ ฉากเสริม',
             camera_angle: 'Medium Shot',
-            action_description: 'ระบุแอคชั่นในฉากนี้...',
-            prompt: 'Medium shot, cinematic lighting, photorealistic commercial photography, 8k',
-            aspect_ratio: prompts[0]?.aspect_ratio || '16:9'
+            camera_movement: 'ถือกล้องนิ่งระดับสายตา',
+            action_description: 'ระบุสิ่งที่ต้องการถ่ายในฉากนี้...',
+            on_screen_text: `ข้อความพาดหัวฉากที่ ${prompts.length + 1}`,
+            live_action_guide: '📐 เว้นพื้นที่ด้านบน 25% สำหรับวางข้อความพาดหัว',
+            prompt: 'Medium shot, natural daylight, lifestyle travel photography, 8k',
+            aspect_ratio: prompts[0]?.aspect_ratio || '9:16'
           }
         })
       });
@@ -437,6 +458,7 @@ export default function App() {
         if (remaining.length > 0) {
           handleSelectSeries(remaining[0].id);
         } else {
+          localStorage.removeItem('cineboard_active_series');
           setSelectedSeriesId('all');
           setPrompts([]);
         }
@@ -452,6 +474,7 @@ export default function App() {
     try {
       await fetch('/api/admin/clear', { method: 'POST' });
       localStorage.removeItem('cineboard_active_series');
+      localStorage.removeItem('cineboard_draft_concept');
       setSeriesList([]);
       setPrompts([]);
       setSelectedSeriesId('all');
@@ -460,19 +483,23 @@ export default function App() {
     }
   };
 
-  // Copy All Prompts
+  // Copy Complete Shooting & Voiceover Script
   const handleCopyAllPrompts = () => {
     if (prompts.length === 0) return;
-    const text = prompts
+    const currentSeriesObj = seriesList.find((s) => s.id === selectedSeriesId);
+    const header = `🎬 สคริปต์ถ่ายทำ: ${currentSeriesObj?.title || 'สตอรี่บอร์ดคอนเทนต์'} (${prompts.length} ฉาก)\n====================================\n\n`;
+    const body = prompts
       .map(
         (p, idx) =>
-          `=== SHOT ${idx + 1}: ${p.title} (${p.camera_angle || 'Medium Shot'}) ===\nAction (TH): ${
-            p.action_description || '-'
-          }\nImage Prompt (EN): ${p.content || '-'}\nVideo Prompt: ${p.video_prompt || '-'}`
+          `📍 ฉากที่ ${idx + 1}: ${p.title} (${p.duration_seconds || 3} วินาที)\n` +
+          `• มุมกล้อง: ${p.camera_angle || 'Medium Shot'} (${p.camera_movement || 'ถือกล้องนิ่ง'})\n` +
+          `• ถ่ายอะไร: ${p.action_description || '-'}\n` +
+          `• ข้อความบนจอ: "${p.on_screen_text || '-'}" (${p.live_action_guide || ''})\n` +
+          `• เสียงพากย์: ${p.dialogue_script || '-'}`
       )
-      .join('\n\n');
+      .join('\n\n------------------------------------\n\n');
 
-    navigator.clipboard.writeText(text);
+    navigator.clipboard.writeText(header + body);
     setCopiedAll(true);
     setTimeout(() => setCopiedAll(false), 2000);
   };

@@ -1,13 +1,18 @@
-// CineBoard Studio 2.0 — Universal AI Storyboard & Visual Director Engine
-// Blazing-Fast Multi-Tier Engine:
-//   1. Instant Thai-to-English Neural Translation (Google GTX, ~150ms) + Intelligent Cinematography Director
-//   2. Optional Gemini / OpenAI LLM Deep Expansion (when API keys are provided)
-//   3. Real AI Image Generation via FLUX.1-schnell (~4s, Free, Zero Key Required) + Pollinations/Gemini Fallbacks
-// Zero Groq Dependency • Zero Cliché Hardcoded Scripts • 100% Theme Respectful
+// CineBoard Studio 3.0 — On-the-Go Content & Travel Storyboard AI Engine
+// Designed for real-world content creators & travelers:
+//   1. Connected Story Arcs (Hook -> Arrival -> Highlight -> Detail -> Emotion -> CTA)
+//   2. Complete Shooting Guide per Shot (กี่วิ • ถ่ายอะไร • มุมกล้องมือถือ • เว้นที่ใส่ข้อความ • บทพากย์)
+//   3. Accurate Thai-to-English Neural Translation + Multi-Tier Free AI Image Rendering (FLUX.1 / SubNP / Pollinations)
 
 const config = require('./config');
 const { getStoryboardSketch } = require('./sketchHelper');
-const { parseMultiSceneScript, enrichSingleBeat } = require('./scriptParser');
+const {
+  parseMultiSceneScript,
+  enrichSingleBeat,
+  buildConnectedStoryBeats,
+  getShotNarrativeRole,
+  extractCleanSubject
+} = require('./scriptParser');
 
 function sanitizeThaiPolite(text) {
   if (!text || typeof text !== 'string') return text;
@@ -41,7 +46,6 @@ function extractJsonObject(rawText) {
 
 /**
  * Instant Thai -> English Neural Translator (~150ms, Free, No Key Required)
- * Ensures every Thai brief or shot description becomes an exact, crystal-clear English prompt for FLUX.1
  */
 async function translateToEnglish(text) {
   if (!text || typeof text !== 'string') return '';
@@ -50,7 +54,6 @@ async function translateToEnglish(text) {
     .replace(/เซลล์/g, 'พนักงานขายรถยนต์')
     .trim();
   if (!clean) return '';
-  // If already pure English (no Thai characters), return as-is
   if (!/[\u0E00-\u0E7F]/.test(clean)) return clean;
 
   try {
@@ -69,11 +72,11 @@ async function translateToEnglish(text) {
   } catch (e) {
     console.warn('[Translator Notice]:', e.message);
   }
-  return clean.replace(/[\u0E00-\u0E7F]+/g, ' ').replace(/\s+/g, ' ').trim() || 'cinematic commercial scene';
+  return clean.replace(/[\u0E00-\u0E7F]+/g, ' ').replace(/\s+/g, ' ').trim() || 'cinematic travel lifestyle scene';
 }
 
 /**
- * Optional LLM Caller (Used when Gemini or OpenAI API key is configured)
+ * Optional LLM Caller (Gemini / OpenAI if configured)
  */
 async function callLLMChat(systemPrompt, userPrompt) {
   if (config.GEMINI_API_KEY) {
@@ -223,11 +226,10 @@ async function callSubnpFreeImage(prompt, model = 'magic') {
 
 /**
  * Generate Real AI Image for a Prompt
- * Automatically translates any Thai text in the prompt to English before calling AI Image Engines
  */
 async function generateAIImage(prompt, options = {}) {
   const {
-    aspect_ratio = '16:9',
+    aspect_ratio = '9:16',
     seed = Math.floor(Math.random() * 1000000)
   } = options;
 
@@ -252,7 +254,7 @@ async function generateAIImage(prompt, options = {}) {
     .trim()
     .slice(0, 450);
 
-  // 1A. Tier 1A: SubNP High-Speed Photorealistic Engine (~2.5s per image, Free, No Rate Limit)
+  // 1A. SubNP High-Speed Photorealistic Engine
   try {
     const subnpRes = await callSubnpFreeImage(cleanTextPrompt, 'magic');
     if (subnpRes && subnpRes.buffer) {
@@ -262,7 +264,7 @@ async function generateAIImage(prompt, options = {}) {
     console.warn('[AI Image SubNP Notice]:', e.message);
   }
 
-  // 1B. Tier 1B: FLUX.1-schnell via Gradio API (Free, ~4s, Ultra-Crisp Photorealistic)
+  // 1B. FLUX.1-schnell via Gradio API
   try {
     const fluxResult = await callGradioFluxSpace(
       'https://black-forest-labs-flux-1-schnell.hf.space',
@@ -278,7 +280,7 @@ async function generateAIImage(prompt, options = {}) {
     console.warn('[AI Image FLUX.1-schnell Notice]:', e.message);
   }
 
-  // 2. Tier 2: Pollinations API Key (if configured)
+  // 2. Pollinations API Key (if configured)
   const encodedPrompt = encodeURIComponent(cleanTextPrompt.slice(0, 320));
   if (config.POLLINATIONS_API_KEY) {
     try {
@@ -297,7 +299,7 @@ async function generateAIImage(prompt, options = {}) {
     }
   }
 
-  // 3. Tier 3: Gemini Imagen (if key configured)
+  // 3. Gemini Imagen (if key configured)
   if (config.GEMINI_API_KEY) {
     try {
       const gUrl = `https://generativelanguage.googleapis.com/v1beta/models/${config.GEMINI_IMAGE_MODEL}:generateImages?key=${config.GEMINI_API_KEY}`;
@@ -322,7 +324,7 @@ async function generateAIImage(prompt, options = {}) {
     }
   }
 
-  // 4. Tier 4: Pollinations Free Turbo Endpoint
+  // 4. Pollinations Free Turbo Endpoint
   try {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 15000);
@@ -344,73 +346,9 @@ async function generateAIImage(prompt, options = {}) {
 }
 
 /**
- * Plan Storyboard Shots
- */
-async function planStoryboard({
-  story_concept,
-  num_shots = 0,
-  target_duration = 30,
-  pacing = 'normal',
-  visual_style = 'auto',
-  camera_breakdown = 'auto_story',
-  aspect_ratio = '16:9'
-}) {
-  return await generateSmartNeuralStoryboard(
-    story_concept,
-    num_shots,
-    target_duration,
-    visual_style,
-    aspect_ratio,
-    camera_breakdown
-  );
-}
-
-/**
- * Infer camera angle automatically from Thai/English beat text or camera_breakdown mode
- */
-function inferBestCameraStage(beatText, index, cameraBreakdown, narrativeStages) {
-  const t = String(beatText || '').toLowerCase();
-  if (/มาโคร|macro|extreme close|ใกล้มาก|พื้นผิว|ตะเข็บ|หยดน้ำ|ปลายนิ้ว|ปุ่ม/.test(t)) {
-    return narrativeStages[2]; // Extreme Close-Up Macro
-  }
-  if (/โคลสอัพ|close-up|closeup|มุมใกล้|ใบหน้า|รอยยิ้ม|แววตา|มือจับ|ถือกล่อง/.test(t)) {
-    return narrativeStages[5]; // Close-Up Reaction / Detail
-  }
-  if (/มุมกว้าง|wide|โชว์รูม|ทั้งคัน|บรรยากาศ|เปิดตัว|สวน|ถนน/.test(t)) {
-    return narrativeStages[0]; // Wide Establishing Shot
-  }
-  if (/มุมต่ำ|มุมเสย|low angle|เคลื่อนตัว|วิ่งออก|ฝากระโปรง|หลังคา/.test(t)) {
-    return narrativeStages[6]; // Low-Angle Hero Tracking
-  }
-  if (/ข้ามไหล่|over-the-shoulder|ots|หน้าจอ|คอนโซล/.test(t)) {
-    return narrativeStages[3]; // Over-The-Shoulder
-  }
-  if (/pov|สายตา|มองดู/.test(t)) {
-    return narrativeStages[4]; // POV
-  }
-
-  // Otherwise pick based on chosen cameraBreakdown mode
-  if (cameraBreakdown === 'macro_detail') {
-    const macroOrder = [2, 5, 3, 1, 2, 6, 5, 7];
-    return narrativeStages[macroOrder[index % macroOrder.length]];
-  }
-  if (cameraBreakdown === 'cinematic_story') {
-    const cineOrder = [0, 1, 3, 5, 6, 7, 1, 5];
-    return narrativeStages[cineOrder[index % cineOrder.length]];
-  }
-  if (cameraBreakdown === 'dynamic_angles') {
-    const dynOrder = [4, 2, 6, 1, 5, 7, 3, 2];
-    return narrativeStages[dynOrder[index % dynOrder.length]];
-  }
-
-  return narrativeStages[index % narrativeStages.length];
-}
-
-/**
- * Resolve Auto or Custom Visual Style & Lighting into English for Image Generation
+ * Resolve Visual Style into English for Image Generation
  */
 async function resolveVisualStyle(styleInput, rawConcept) {
-  // Check if user pasted a Visual Style line inside their prompt
   const embeddedMatch = String(rawConcept || '').match(/visual\s*style(?:\s*reference)?[^:\n]*:\s*([^\r\n]+)/i);
   if (embeddedMatch && embeddedMatch[1].trim()) {
     const extracted = embeddedMatch[1].trim();
@@ -423,19 +361,18 @@ async function resolveVisualStyle(styleInput, rawConcept) {
     if (/asmr|มาโคร|macro|craftsmanship|สัมผัส/.test(text)) {
       return 'macro photography, hyper-realistic, soft natural daylight, premium commercial style, sharp tactile details';
     }
-    if (/รถ|โชว์รูม|mazda|ev|car|suv|ส่งมอบรถ/.test(text)) {
-      return 'high-end automotive commercial photography, sleek showroom & golden hour lighting, glossy reflections, photorealistic 8k';
+    if (/วัด|พระ|โบราณ|เมืองเก่า|temple/.test(text)) {
+      return 'warm golden hour sunlight, rich cultural travel photography, cinematic depth of field, vibrant natural colors, 8k';
     }
-    if (/เซรั่ม|ครีม|ผิว|บิวตี้|สกินแคร์|skin|serum|beauty/.test(text)) {
-      return 'luxury skincare beauty commercial, soft diffused morning sunlight, dewy glass skin texture, clean minimalist studio';
+    if (/คาเฟ่|กาแฟ|มัทฉะ|อาหาร|ขนม|ของกิน|cafe|food/.test(text)) {
+      return 'bright natural window daylight, appetizing lifestyle food & cafe cinematography, shallow depth of field, warm aesthetic';
     }
-    if (/คาเฟ่|กาแฟ|มัทฉะ|อาหาร|ขนม|เครื่องดื่ม|cafe|food/.test(text)) {
-      return 'warm natural window daylight, appetizing lifestyle food cinematography, shallow depth of field, rich organic colors';
+    if (/ทะเล|ชายหาด|ภูเขา|ดอย|ธรรมชาติ|แคมป์|beach|mountain/.test(text)) {
+      return 'crisp sunny travel vlog photography, vibrant sky and natural scenery, golden hour rim lighting, photorealistic 8k';
     }
-    return 'high-end cinematic commercial photography, natural volumetric lighting, shallow depth of field, hyper-realistic 8k';
+    return 'bright natural daylight, high-end lifestyle travel & creator cinematography, shallow depth of field, hyper-realistic 8k';
   }
 
-  // If user typed custom Thai or English style, translate any Thai to English
   if (/[\u0E00-\u0E7F]/.test(cleanStyle)) {
     const tr = await translateToEnglish(cleanStyle);
     return `${tr}, photorealistic, high detail`;
@@ -444,186 +381,128 @@ async function resolveVisualStyle(styleInput, rawConcept) {
 }
 
 /**
- * Smart Neural Storyboard Director
- * Automatically breaks user's Thai/English brief into distinct cinematic shots by story beats & camera angles
+ * Plan Storyboard Shots — Connected, Cohesive, Practical Shooting Guide
  */
-async function generateSmartNeuralStoryboard(
-  concept,
-  requestedCount,
-  totalDuration,
-  style,
-  aspect_ratio,
-  camera_breakdown = 'auto_story'
-) {
-  const rawText = String(concept || '').trim();
-  const resolvedStyleEn = await resolveVisualStyle(style, rawText);
+async function planStoryboard({
+  story_concept,
+  num_shots = 0,
+  target_duration = 20,
+  pacing = 'normal',
+  visual_style = 'auto',
+  camera_breakdown = 'auto_story',
+  aspect_ratio = '9:16'
+}) {
+  const rawText = String(story_concept || '').trim();
+  const resolvedStyleEn = await resolveVisualStyle(visual_style, rawText);
 
-  // 1. Direct Multi-Scene Detection (inline numbers, multiline numbers, or structured scene headers)
+  // 1. Check if user pasted a multi-scene numbered script
   const parsed = parseMultiSceneScript(rawText);
   if (parsed && parsed.shots && parsed.shots.length >= 2) {
-    return parsed;
+    const enrichedShots = await Promise.all(parsed.shots.map(async (s, idx) => {
+      let enPrompt = s.prompt || s.title;
+      if (/[\u0E00-\u0E7F]/.test(enPrompt)) {
+        const tr = await translateToEnglish(s.action_description || s.title);
+        enPrompt = `${s.camera_angle || 'Medium Shot'}, ${tr}, ${resolvedStyleEn}, photorealistic 8k`;
+      }
+      const updated = {
+        ...s,
+        shot_number: idx + 1,
+        step_number: idx + 1,
+        aspect_ratio: aspect_ratio || '9:16',
+        prompt: enPrompt,
+        content: enPrompt
+      };
+      updated.image_url = getStoryboardSketch(updated);
+      return updated;
+    }));
+    return {
+      ...parsed,
+      shots: enrichedShots
+    };
   }
 
-  // 2. Intelligent Target Shot Count Analysis:
-  // Priority: (a) Explicit text in prompt ("ขอ 3 ฉาก", "10 ช็อต", "4 scenes")
-  //           (b) Requested count from client UI (requestedCount)
-  //           (c) Narrative actions / clauses directly in user's content
-  //           (d) Default rich cinematic arc (6 to 8 shots) without arbitrary restrictions
+  // 2. Determine Target Shot Count
   let targetCount = 0;
   const countMatch = rawText.match(/(?:ขอ|เอา|อยากได้|สร้าง|ทำ|จำนวน)?\s*(\d+)\s*(?:ฉาก|ช็อต|ซีน|ช้อต|ตอน|shots?|scenes?|cuts?)/i);
   if (countMatch) {
     targetCount = parseInt(countMatch[1], 10);
-  } else if (requestedCount && Number(requestedCount) >= 2) {
-    targetCount = parseInt(requestedCount, 10);
+  } else if (num_shots && Number(num_shots) >= 2) {
+    targetCount = parseInt(num_shots, 10);
   } else {
-    // Analyze narrative action clauses directly from content
-    const narrativeClauses = rawText.split(/(?:,|\n|\t|->|➔|=>|จากนั้น|ต่อด้วย|แล้วค่อย|แล้ว|ก่อนจะ|ก่อนที่|จบด้วย|ปิดท้ายด้วย)/).filter(p => p.trim().length >= 3);
-    if (narrativeClauses.length >= 3) {
-      targetCount = narrativeClauses.length;
-    } else if (/(?:asmr|macro|เจาะลึก|สารคดี|series|ซีรีส์)/i.test(rawText)) {
-      targetCount = 8;
-    } else {
-      targetCount = 6; // Standard rich multi-angle cinematic default
-    }
+    targetCount = 6; // Ideal 6-scene story arc (Hook -> Walk-in -> Highlight -> Detail -> Emotion -> CTA)
   }
+  targetCount = Math.max(2, Math.min(12, targetCount || 6));
 
-  // Clamp targetCount safely between 2 and 16
-  targetCount = Math.max(2, Math.min(16, targetCount || 6));
+  const cleanTopic = extractCleanSubject(rawText);
+  const topicEn = await translateToEnglish(cleanTopic);
 
-  // Helper to pick evenly distributed beats from any size pool
-  function pickBeats(pool, count) {
-    if (count <= 1) return [pool[0]];
-    if (count >= pool.length) return pool.slice(0, count);
-    const result = [];
-    for (let i = 0; i < count; i++) {
-      const idx = Math.round((i * (pool.length - 1)) / (count - 1));
-      result.push(pool[idx]);
-    }
-    return result;
-  }
-
-  // 3. Domain Master Pools (10-12 progressive narrative beats per domain)
-  const t = rawText.toLowerCase();
-  let masterPool = [];
-
-  if (/ตกปลา|ปลา|คันเบ็ด|รอก|เหยื่อ|บ่อปลา|แม่น้ำ|angling|fish/.test(t)) {
-    masterPool = [
-      'ชวนเพื่อนแวะร้านจำหน่ายอุปกรณ์ตกปลาขนาดใหญ่ เตรียมความพร้อมและวางแผนเดินทาง',
-      'หยิบคันเบ็ดคาร์บอนไฟเบอร์น้ำหนักเบาและรอกตกปลาโลหะขึ้นมาทดสอบความยืดหยุ่นในร้าน',
-      'ออกเดินทางถึงริมน้ำ แสงเช้าสาดส่องผิวน้ำนิ่ง มีหมอกบางๆ ลอยละล่อง',
-      'ล่องเรือหางยาวออกสู่ผืนน้ำกว้างใหญ่ สัมผัสสายลมและธรรมชาติบริสุทธิ์',
-      'หวดคันเบ็ดทอดสายลงสู่ผืนน้ำนิ่งอย่างมีสมาธิ รอคอยจังหวะอย่างใจเย็น',
-      'สายเบ็ดกระตุกแรง คันเบ็ดโค้งงออย่างรุนแรง ปลาตัวโตดิ้นกระโดดสาดละอองน้ำระยิบระยับ',
-      'ออกแรงหมุนรอกงัดสู้ปลาอย่างตื่นเต้น และยกปลาตัวโตขึ้นมาบนเรือด้วยรอยยิ้มภาคภูมิใจ',
-      'นำปลาสดจากน้ำมาก่อเตาถ่านแคมป์ปิ้งริมน้ำ ควันหอมฉุยลอยกรุ่น',
-      'ย่างปลาสดจนสุกเกรียมเหลืองทอง โรยเกลือสมุนไพร กลิ่นหอมน่ารับประทาน',
-      'ทุกคนล้อมวงรับประทานอาหาร ยิ้มหัวเราะชนแก้วแห่งความสุขในวันพักผ่อนริมน้ำ'
-    ];
-  } else if (/รถ|โชว์รูม|ส่งมอบ|ขับขี่|กุญแจ|พวงมาลัย|กระจังหน้า|mazda|ev|car|suv|handover/.test(t)) {
-    masterPool = [
-      'เปิดตัวรถยนต์พรีเมียมคลุมผ้าซาตินสีดำในโชว์รูมกระจกโปร่ง แสงสตูดิโอสะท้อนหรูหรา',
-      'พนักงานขายค่อยๆ ดึงผ้าคลุมออก เผยให้เห็นไฟหน้า LED ดีไซน์โฉบเฉี่ยวและกระจังหน้าเรืองแสง',
-      'ช็อตเจาะรายละเอียดล้ออัลลอย เส้นสายตัวถังแอโรไดนามิก และงานประกอบอันประณีต',
-      'พนักงานส่งมอบกล่องกุญแจหนังแท้และสมาร์ทคีย์ให้ลูกค้าด้วยรอยยิ้มอบอุ่น',
-      'ลูกค้าและครอบครัวยิ้มดีใจ ถ่ายรูปคู่กับรถใหม่ติดโบว์แดงแห่งความภาคภูมิใจ',
-      'เปิดประตูสัมผัสกลิ่นอายห้องโดยสารใหม่ พวงมาลัยหนังแท้เย็บมือและเบาะนั่ง Ergonomic',
-      'ปลายนิ้วสัมผัสปุ่ม Start หน้าปัดดิจิทัลสว่างวาบพร้อมเสียงระบบไฟฟ้าไฮเทคตื่นตัว',
-      'หลังคาแก้ว Panoramic Sunroof เลื่อนเปิดรับแสงแดดธรรมชาติอย่างนุ่มนวลและเงียบกริบ',
-      'เสียงปิดประตูดัง "ทึบ" หนักแน่น บ่งบอกถึงความปลอดภัยและงานวิศวกรรมระดับพรีเมียม',
-      'รถยนต์เคลื่อนตัวออกจากโชว์รูมสู่ท้องถนนยามเย็น แสงอาทิตย์สีทองสะท้อนตัวถังเงางาม'
-    ];
-  } else if (/เซรั่ม|ผิว|ครีม|ดรอปเปอร์|แต่งหน้า|สกินแคร์|บำรุง|skin|serum|beauty/.test(t)) {
-    masterPool = [
-      'ขวดเซรั่มแก้วใสวางเด่นบนผิวน้ำกระทบแสงแดดเช้า มีหยดน้ำบริสุทธิ์เกาะระยิบระยับ',
-      'ดรอปเปอร์แก้วค่อยๆ ดูดเนื้อเซรั่มใสบริสุทธิ์เข้มข้นขึ้นมาอย่างช้าๆ',
-      'หยดเนื้อเซรั่มลงบนผิวหลังมือ ภาพมาโครเห็นความชุ่มชื้นและโมเลกุลน้ำแตกตัวชัดเจน',
-      'ปลายนิ้วเกลี่ยเนื้อเซรั่มลงบนพวงแก้มอย่างอ่อนโยน เนื้อบางเบาซึมซาบสู่ผิวทันที',
-      'สัมผัสความสดชื่นและความชุ่มชื้นล้ำลึกที่ฟื้นบำรุงผิวหน้าอย่างเป็นธรรมชาติ',
-      'ภาพโคลสอัพซูมเจาะลึกผิวหน้าที่ดูเรียบเนียน ฉ่ำวาว อิ่มน้ำ สุขภาพดีไร้ที่ติ',
-      'แสงธรรมชาติสะท้อนความเปล่งปลั่ง กระจ่างใสของผิวหน้าอย่างมีออร่า Glass Skin',
-      'นางแบบส่องกระจกด้วยรอยยิ้มพึงพอใจและมั่นใจในผิวหน้าสดที่ดูอ่อนเยาว์',
-      'นางแบบหันมายิ้มอย่างมั่นใจกับกล้องในลุคคลีนมินิมอล เผยเสน่ห์ผิวสวยอย่างเป็นธรรมชาติ',
-      'ช็อตจบขวดผลิตภัณฑ์คู่กับหยดน้ำบริสุทธิ์และดอกไม้สีขาว พร้อมพื้นที่วางโลโก้แบรนด์'
-    ];
-  } else if (/กาแฟ|คาเฟ่|อาหาร|กิน|ย่าง|ทำอาหาร|ชิม|มัทฉะ|ครัว|cafe|food|cook|eat/.test(t)) {
-    masterPool = [
-      'ผลักประตูไม้เข้าสู่ร้าน กลิ่นหอมกรุ่นของอาหารและเครื่องดื่มลอยมาต้อนรับอย่างอบอุ่น',
-      'เชฟหรือบาริสต้ากำลังคัดสรรวัตถุดิบคุณภาพพรีเมียมด้วยความใส่ใจและพิถีพิถัน',
-      'ช็อตเตรียมวัตถุดิบ บดเมล็ดกาแฟ หรือแล่เนื้อสดอย่างเชี่ยวชาญ',
-      'การปรุงสดบนเตาไฟหรือการเทนมแยกชั้นเครื่องดื่มอย่างประณีต แสงไฟอบอุ่น',
-      'จัดจานเสิร์ฟอย่างสวยงามสไตล์มินิมอล แสงธรรมชาติส่องกระทบจานอาหาร',
-      'ภาพโคลสอัพจานอาหาร ควันหอมฉุย ซอสเยิ้มๆ หรือฟองนมนุ่มละมุนน่ารับประทาน',
-      'ตักอาหารคำโตเข้าปากหรือยกแก้วขึ้นจิบ สัมผัสรสชาติแรกอันกลมกล่อมลงตัว',
-      'สีหน้ายิ้มกว้างด้วยความประทับใจในรสชาติอันเป็นเอกลักษณ์และความสุขที่ได้ลิ้มลอง',
-      'บรรยากาศลูกค้านั่งผ่อนคลายริมหน้าต่างรับแสงแดดอุ่น สบายๆ สไตล์สโลว์ไลฟ์',
-      'ภาพจบมุมโปรดของร้านคู่กับเมนูซิกเนเจอร์ พร้อมเชิญชวนทุกคนมาสัมผัสความอร่อย'
-    ];
-  } else {
-    masterPool = [
-      `ภาพมุมกว้างเปิดฉากสร้างบรรยากาศ แนะนำบริบทและจุดเริ่มต้นของ ${rawText}`,
-      `ตัวละครหลักหรือสิ่งของสำคัญปรากฏขึ้น พร้อมเป้าหมายหรือความต้องการอันชัดเจน`,
-      `การเริ่มต้นลงมือทำขั้นตอนแรกด้วยความตื่นเต้นและการเตรียมตัวอย่างพิถีพิถัน`,
-      `เผชิญกับรายละเอียดความท้าทาย หรือเจาะลึกฟีเจอร์เด่นที่น่าสนใจ`,
-      `ช่วงเวลาสำคัญของการลงมือทำอย่างมุ่งมั่นและใส่ใจในทุกรายละเอียด`,
-      `จุดไคลแม็กซ์ที่น่าตื่นเต้นที่สุด ช่วงเวลาแห่งการตัดสินใจหรือการพลิกผัน`,
-      `ผลลัพธ์แห่งความสำเร็จที่ปรากฏชัดเจน ความรู้สึกโล่งใจและภาคภูมิใจ`,
-      `ภาพมุมมองใกล้เจาะรายละเอียดความสำเร็จ รอยยิ้ม และความงดงามที่เกิดขึ้น`,
-      `การแบ่งปันความสุขและสร้างช่วงเวลาที่น่าจดจำร่วมกัน`,
-      `บทสรุปปิดท้ายอันทรงพลัง ประทับใจ พร้อมส่งต่อแรงบันดาลใจและ Call to Action`
-    ];
-  }
-
-  // Synthesize beats matching targetCount
-  const synthesizedBeats = pickBeats(masterPool, targetCount);
-
-  const cleanTitle = rawText.replace(/^[🎬🎥✨🚗🎧📱#\s*\d.)\-]+/, '').slice(0, 60) || 'โปรเจกต์สตอรี่บอร์ดงานภาพยนตร์';
-  const shots = synthesizedBeats.map((beat, idx) => {
-    const shotNum = idx + 1;
-    const enriched = enrichSingleBeat(cleanTitle, beat, idx, synthesizedBeats.length, resolvedStyleEn);
-    const titleClean = `ฉากที่ ${shotNum}: ${beat.slice(0, 40)}`;
-
-    const shotData = {
-      shot_number: shotNum,
-      scene_number: shotNum,
-      scene_title: titleClean,
-      title: titleClean,
-      subtitle: `${enriched.camera_angle_th} • ${enriched.lens_focal}`,
-      camera_angle: enriched.camera_angle,
-      camera_angle_th: enriched.camera_angle_th,
-      camera_movement: enriched.camera_movement,
-      lens_focal: enriched.lens_focal,
-      duration_seconds: 3.0,
-      action_description: enriched.action_description,
-      dialogue: enriched.dialogue,
-      audio_foley: enriched.audio_foley,
-      on_screen_text: shotNum === synthesizedBeats.length ? cleanTitle.slice(0, 35) : '',
-      prompt: enriched.prompt,
-      video_prompt: enriched.video_prompt,
-      live_action_guide: `มุมกล้อง: ${enriched.camera_angle} | เลนส์: ${enriched.lens_focal} | จัดแสงธรรมชาติเน้นมิติความลึก (Depth of Field)`,
-      visual_style: resolvedStyleEn,
-      aspect_ratio: aspect_ratio || '16:9'
-    };
-    shotData.image_url = getStoryboardSketch(shotData);
-    return shotData;
-  });
+  // 3. Build deeply connected story beats tailored to the user's topic
+  const connectedBeats = buildConnectedStoryBeats(rawText, targetCount);
 
   let curTime = 0;
+  const formatSec = (seconds) => {
+    const mins = Math.floor(seconds / 60);
+    const s = seconds % 60;
+    const sStr = s < 10 ? '0' + s.toFixed(1) : s.toFixed(1);
+    return `${mins}:${sStr}`;
+  };
+
+  const shots = await Promise.all(connectedBeats.map(async (beat, idx) => {
+    const shotNum = idx + 1;
+    const roleInfo = getShotNarrativeRole(idx, connectedBeats.length);
+    const dur = beat.duration || roleInfo.defaultDuration || 3.0;
+
+    // Ensure English prompt is 100% English and specific to the user's topic + beat
+    let promptEn = beat.promptEn || '';
+    if (/[\u0E00-\u0E7F]/.test(promptEn) || !promptEn) {
+      const actionEn = await translateToEnglish(beat.action || beat.title);
+      promptEn = `${beat.angle}, ${actionEn} at ${topicEn}, ${resolvedStyleEn}, photorealistic, crisp details, 8k`;
+    } else {
+      promptEn = `${promptEn}, ${resolvedStyleEn}`;
+    }
+
+    const shotObj = {
+      shot_number: shotNum,
+      step_number: shotNum,
+      scene_number: shotNum,
+      scene_title: roleInfo.role,
+      shot_role: roleInfo.role,
+      title: `ฉากที่ ${shotNum}: ${beat.title}`,
+      subtitle: `${beat.angleTh} • ${beat.lens}`,
+      camera_angle: beat.angle,
+      camera_angle_th: beat.angleTh,
+      camera_movement: beat.movement,
+      lens_focal: beat.lens,
+      shot_size: beat.lens,
+      duration_seconds: dur,
+      action_description: beat.action,
+      dialogue: beat.dialogue,
+      dialogue_script: beat.dialogue,
+      audio_foley: beat.foley,
+      on_screen_text: beat.onScreenText,
+      live_action_guide: beat.spaceGuide || roleInfo.textSafeZone,
+      prompt: promptEn,
+      content: promptEn,
+      video_prompt: `[Camera: ${beat.movement}] [Angle: ${beat.angle}] ${promptEn}`,
+      visual_style: visual_style === 'auto' ? 'แสงธรรมชาติคมชัด สไตล์ครีเอเตอร์' : visual_style,
+      aspect_ratio: aspect_ratio || '9:16'
+    };
+
+    shotObj.image_url = getStoryboardSketch(shotObj);
+    return shotObj;
+  }));
+
+  // Compute cumulative timecodes synchronously
   shots.forEach((s) => {
     const startSec = curTime;
     const endSec = Math.round((startSec + s.duration_seconds) * 10) / 10;
     curTime = endSec;
-    const formatSec = (seconds) => {
-      const mins = Math.floor(seconds / 60);
-      const s = seconds % 60;
-      const sStr = s < 10 ? '0' + s.toFixed(1) : s.toFixed(1);
-      return `${mins}:${sStr}`;
-    };
-    s.timecode = `${formatSec(startSec)} - ${formatSec(endSec)}`;
+    s.timecode = `${formatSec(startSec)} - ${formatSec(endSec)} (${s.duration_seconds}s)`;
   });
 
   return {
-    project_title: cleanTitle,
-    logline: `สตอรี่บอร์ด ${shots.length} ช็อต ถ่ายทอดเรื่องราว "${cleanTitle}"`,
+    project_title: cleanTopic,
+    logline: `สตอรี่บอร์ดพร้อมถ่าย ${shots.length} ฉาก (${curTime} วินาที) สำหรับ "${cleanTopic}"`,
     total_shots: shots.length,
     total_duration: curTime,
     target_duration: curTime,

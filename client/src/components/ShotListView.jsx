@@ -8,9 +8,9 @@ import {
   RefreshCw,
   Film,
   Camera,
-  Clock,
   ArrowLeft,
-  Copy
+  Type,
+  Volume2
 } from 'lucide-react';
 
 const CAMERA_ANGLES = [
@@ -21,13 +21,14 @@ const CAMERA_ANGLES = [
   'Extreme Close-up / Macro',
   'Low Angle Hero Shot',
   'Over-the-Shoulder Shot',
+  'POV Reveal Shot',
   'High Angle / Bird Eye'
 ];
 
 export default function ShotListView({
   mode = 'bulk_editor', // 'bulk_editor' | 'shotlist'
   prompts = [],
-  preCommitDraft = null, // When non-null, user is reviewing/editing planned shots BEFORE committing to board
+  preCommitDraft = null,
   onCancelDraft,
   onCommitDraftAndRender,
   onSaveBulkEdits,
@@ -49,14 +50,19 @@ export default function ShotListView({
         preCommitDraft.shots.map((s, idx) => ({
           id: s.id || `draft-${idx + 1}`,
           step_number: idx + 1,
-          title: s.title || `ช็อตที่ ${idx + 1}`,
+          shot_role: s.shot_role || s.scene_title || `ฉากที่ ${idx + 1}`,
+          title: s.title || `ฉากที่ ${idx + 1}`,
           camera_angle: s.camera_angle || 'Medium Shot',
+          camera_movement: s.camera_movement || 'ถือกล้องนิ่ง / แพนช้าๆ',
           duration_seconds: s.duration_seconds || 3,
           action_description: s.action_description || s.title || '',
+          on_screen_text: s.on_screen_text || '',
+          live_action_guide:
+            s.live_action_guide || '📐 เว้นพื้นที่ด้านบน 25% สำหรับวางข้อความพาดหัว',
           dialogue_script: s.dialogue || s.dialogue_script || '',
           content: s.prompt || s.content || '',
           video_prompt: s.video_prompt || '',
-          aspect_ratio: s.aspect_ratio || preCommitDraft.aspect_ratio || '16:9',
+          aspect_ratio: s.aspect_ratio || preCommitDraft.aspect_ratio || '9:16',
           image_url: s.image_url || ''
         }))
       );
@@ -65,10 +71,15 @@ export default function ShotListView({
         prompts.map((p, idx) => ({
           ...p,
           step_number: idx + 1,
-          title: p.title || `ช็อตที่ ${idx + 1}`,
+          shot_role: p.shot_role || p.scene_title || `ฉากที่ ${idx + 1}`,
+          title: p.title || `ฉากที่ ${idx + 1}`,
           camera_angle: p.camera_angle || 'Medium Shot',
+          camera_movement: p.camera_movement || 'ถือกล้องนิ่ง / แพนช้าๆ',
           duration_seconds: p.duration_seconds || 3,
           action_description: p.action_description || '',
+          on_screen_text: p.on_screen_text || '',
+          live_action_guide:
+            p.live_action_guide || '📐 เว้นพื้นที่ด้านบน 25% สำหรับวางข้อความพาดหัว',
           dialogue_script: p.dialogue_script || '',
           content: p.content || '',
           video_prompt: p.video_prompt || ''
@@ -90,16 +101,20 @@ export default function ShotListView({
       ...prev,
       {
         id: `new-shot-${Date.now()}`,
-         isNew: true,
+        isNew: true,
         step_number: prev.length + 1,
+        shot_role: '✨ ฉากเสริม',
         title: `ฉากที่ ${prev.length + 1}`,
         camera_angle: 'Medium Shot',
+        camera_movement: 'ถือกล้องนิ่งระดับสายตา',
         duration_seconds: 3,
-        action_description: 'ระบุรายละเอียดแอคชั่นในฉากนี้...',
+        action_description: 'ระบุว่าฉากนี้ต้องถ่ายอะไร...',
+        on_screen_text: `ข้อความพาดหัวฉากที่ ${prev.length + 1}`,
+        live_action_guide: '📐 เว้นพื้นที่ด้านบน 25% สำหรับวางข้อความ',
         dialogue_script: '',
-        content: 'Medium shot, cinematic lighting, photorealistic, 8k resolution, sharp focus',
+        content: 'Medium shot, natural daylight, travel lifestyle photography, 8k',
         video_prompt: 'Smooth cinematic camera motion',
-        aspect_ratio: preCommitDraft?.aspect_ratio || prompts[0]?.aspect_ratio || '16:9'
+        aspect_ratio: preCommitDraft?.aspect_ratio || prompts[0]?.aspect_ratio || '9:16'
       }
     ]);
   };
@@ -120,7 +135,7 @@ export default function ShotListView({
             project_title: draftTitle,
             shots: editableShots
           },
-          false // commit without auto-rendering all if user only clicked save
+          false
         );
       } else {
         await onSaveBulkEdits(editableShots);
@@ -142,7 +157,7 @@ export default function ShotListView({
             project_title: draftTitle,
             shots: editableShots
           },
-          true // commit AND auto-render FLUX.1 images for all shots!
+          true
         );
       } else {
         await onSaveBulkAndRenderAll(editableShots);
@@ -158,67 +173,74 @@ export default function ShotListView({
       <div className="p-4 sm:p-6 space-y-4">
         <div className="flex items-center justify-between bg-[#11151E] p-4 rounded-2xl border border-slate-800 no-print">
           <div>
-            <h2 className="text-base font-extrabold text-white">ตารางกำกับการถ่ายทำ (Production Shot List)</h2>
-            <p className="text-xs text-slate-400">สรุปรายการช็อต มุมกล้อง แอคชั่น และ Prompt สำหรับทีมโปรดักชันหรือพิมพ์ PDF</p>
+            <h2 className="text-base font-extrabold text-white">
+              ตารางสรุปแผนการถ่ายทำ (Production Shooting Sheet)
+            </h2>
+            <p className="text-xs text-slate-400">
+              สรุปครบทุกฉาก: เวลา มุมกล้อง ถ่ายอะไร ข้อความบนจอ และบทพากย์ (สั่งพิมพ์ PDF ได้ทันที)
+            </p>
           </div>
           <button
             onClick={onBackToBoard}
             className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-bold text-slate-200 flex items-center gap-1.5 cursor-pointer"
           >
             <ArrowLeft className="w-3.5 h-3.5" />
-            <span>กลับหน้าบอร์ดภาพ</span>
+            <span>กลับหน้าบอร์ดสตอรี่บอร์ด</span>
           </button>
         </div>
 
         <div className="overflow-x-auto rounded-2xl border border-slate-800 bg-[#11151E]">
           <table className="w-full text-left border-collapse">
             <thead>
-              <tr className="border-b border-slate-800 bg-[#0D1017] text-[11px] font-bold text-slate-400 uppercase">
-                <th className="py-3 px-4 w-16">ช็อต</th>
-                <th className="py-3 px-4 w-44">ภาพตัวอย่าง</th>
-                <th className="py-3 px-4 w-48">ชื่อฉาก / มุมกล้อง</th>
-                <th className="py-3 px-4">แอคชั่น & บทพูด (TH)</th>
-                <th className="py-3 px-4">AI Image Prompt (EN)</th>
+              <tr className="border-b border-slate-800 bg-[#0D1017] text-[11px] font-bold text-slate-300 uppercase">
+                <th className="py-3 px-4 w-20">ฉาก / เวลา</th>
+                <th className="py-3 px-4 w-44">ภาพไกด์ / AI</th>
+                <th className="py-3 px-4 w-52">มุมกล้อง & วิธีถือถ่าย</th>
+                <th className="py-3 px-4">ถ่ายอะไรบ้าง (Action)</th>
+                <th className="py-3 px-4 w-60">ข้อความบนจอ & จุดเว้นเฟรม</th>
+                <th className="py-3 px-4 w-64">เสียงพากย์ (Voiceover)</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800/70 text-xs">
-              {editableShots.map((s, idx) => {
-                const isSvg = !s.image_url || s.image_url.startsWith('data:image/svg+xml');
-                return (
-                  <tr key={s.id || idx} className="hover:bg-slate-800/30">
-                    <td className="py-3 px-4 font-mono font-black text-amber-400 align-top">
+              {editableShots.map((s, idx) => (
+                <tr key={s.id || idx} className="hover:bg-slate-800/30">
+                  <td className="py-3 px-4 align-top">
+                    <div className="font-mono font-black text-amber-400 text-sm">
                       #{String(idx + 1).padStart(2, '0')}
-                    </td>
-                    <td className="py-3 px-4 align-top">
-                      {!isSvg ? (
-                        <img
-                          src={s.image_url}
-                          alt={s.title}
-                          className="w-36 aspect-video object-cover rounded-lg border border-slate-700"
-                        />
-                      ) : (
-                        <div className="w-36 aspect-video rounded-lg bg-slate-900 border border-slate-800 flex items-center justify-center text-[10px] text-slate-500">
-                          ยังไม่ได้วาดภาพ
-                        </div>
-                      )}
-                    </td>
-                    <td className="py-3 px-4 align-top space-y-1">
-                      <div className="font-bold text-white">{s.title}</div>
-                      <div className="text-[11px] text-amber-300 font-mono">{s.camera_angle}</div>
-                      <div className="text-[11px] text-slate-400">{s.duration_seconds || 3} วินาที</div>
-                    </td>
-                    <td className="py-3 px-4 align-top space-y-1 text-slate-200">
-                      <p>{s.action_description}</p>
-                      {s.dialogue_script && (
-                        <p className="text-[11px] text-emerald-300 italic">"{s.dialogue_script}"</p>
-                      )}
-                    </td>
-                    <td className="py-3 px-4 align-top font-mono text-[11px] text-slate-300">
-                      {s.content}
-                    </td>
-                  </tr>
-                );
-              })}
+                    </div>
+                    <div className="text-[11px] font-mono text-emerald-300 font-bold mt-0.5">
+                      {s.duration_seconds || 3} วินาที
+                    </div>
+                  </td>
+                  <td className="py-3 px-4 align-top">
+                    {s.image_url ? (
+                      <img
+                        src={s.image_url}
+                        alt={s.title}
+                        className="w-36 aspect-video object-cover rounded-lg border border-slate-700"
+                      />
+                    ) : null}
+                  </td>
+                  <td className="py-3 px-4 align-top space-y-1">
+                    <div className="font-bold text-white">{s.title}</div>
+                    <div className="text-[11px] text-sky-300 font-semibold">{s.camera_angle}</div>
+                    <div className="text-[11px] text-slate-400">{s.camera_movement}</div>
+                  </td>
+                  <td className="py-3 px-4 align-top text-slate-200 leading-relaxed">
+                    {s.action_description}
+                  </td>
+                  <td className="py-3 px-4 align-top space-y-1">
+                    <div className="font-bold text-amber-300">“{s.on_screen_text || '-'}”</div>
+                    <div className="text-[11px] text-slate-400">{s.live_action_guide}</div>
+                  </td>
+                  <td className="py-3 px-4 align-top space-y-1">
+                    <div className="text-emerald-200 leading-relaxed">{s.dialogue_script || '-'}</div>
+                    {s.audio_foley && (
+                      <div className="text-[10px] text-slate-400">🎵 {s.audio_foley}</div>
+                    )}
+                  </td>
+                </tr>
+              ))}
             </tbody>
           </table>
         </div>
@@ -229,14 +251,13 @@ export default function ShotListView({
   // BULK PROMPT & SCRIPT EDITOR MODE
   return (
     <div className="p-4 sm:p-6 space-y-5 max-w-6xl mx-auto">
-      {/* Sticky Editor Top Action Bar */}
       <div className="sticky top-16 z-30 bg-[#131824]/95 backdrop-blur-md p-4 rounded-2xl border border-amber-500/30 shadow-xl flex flex-wrap items-center justify-between gap-3">
         <div className="space-y-0.5">
           <div className="flex items-center gap-2">
             <span className="px-2.5 py-0.5 rounded-md bg-amber-500 text-slate-950 text-[11px] font-black uppercase">
-              {isDraftMode ? 'ตรวจและแก้ไข Prompt ก่อนวาดภาพ' : 'แก้ไขบทและ Prompt ทั้งหมด'}
+              {isDraftMode ? 'ตรวจและแก้แผนทุกฉากก่อนสร้างจริง' : 'แก้ไขแผนการถ่ายทำทั้งหมด'}
             </span>
-            <span className="text-xs font-mono text-slate-400">({editableShots.length} ช็อต)</span>
+            <span className="text-xs font-mono text-slate-400">({editableShots.length} ฉาก)</span>
           </div>
           {isDraftMode ? (
             <div className="flex items-center gap-2 pt-1">
@@ -250,7 +271,7 @@ export default function ShotListView({
             </div>
           ) : (
             <p className="text-xs text-slate-300">
-              ปรับแก้ชื่อฉาก แอคชั่นภาษาไทย และคำสั่ง AI Prompt ภาษาอังกฤษของทุกช็อตได้ในหน้าเดียว
+              ปรับแก้เวลา มุมกล้อง แอคชั่น ข้อความพาดหัว และบทพากย์ของทุกฉากได้ในหน้าเดียว
             </p>
           )}
         </div>
@@ -272,7 +293,7 @@ export default function ShotListView({
             className="px-3.5 py-2 rounded-xl bg-[#1A2130] hover:bg-[#232C40] border border-slate-700 text-xs font-bold text-emerald-300 flex items-center gap-1.5 cursor-pointer"
           >
             <Plus className="w-3.5 h-3.5" />
-            <span>เพิ่มช็อตใหม่</span>
+            <span>เพิ่มฉากใหม่</span>
           </button>
 
           <button
@@ -289,7 +310,7 @@ export default function ShotListView({
             ) : (
               <>
                 <Save className="w-3.5 h-3.5 text-amber-400" />
-                <span>{isDraftMode ? 'บันทึกช็อตลงบอร์ด' : 'บันทึกการแก้ไขทั้งหมด'}</span>
+                <span>{isDraftMode ? 'บันทึกแผนลงบอร์ด (ยังไม่วาด AI)' : 'บันทึกการแก้ไขทั้งหมด'}</span>
               </>
             )}
           </button>
@@ -298,13 +319,13 @@ export default function ShotListView({
             type="button"
             disabled={saving}
             onClick={handleSaveAndRender}
-            className="px-4 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 font-extrabold text-xs shadow-lg shadow-amber-500/20 flex items-center gap-1.5 cursor-pointer"
+            className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-extrabold text-xs shadow-lg shadow-amber-500/20 flex items-center gap-1.5 cursor-pointer"
           >
             <Sparkles className="w-4 h-4 stroke-[2.5]" />
             <span>
               {isDraftMode
-                ? `ยืนยันแตกช็อต + วาดภาพ AI ทั้ง ${editableShots.length} ช็อตทันที`
-                : 'บันทึก + สั่งวาดภาพ AI ใหม่ทุกช็อต'}
+                ? `ยืนยันสร้าง ${editableShots.length} ฉาก + วาดภาพ AI`
+                : 'บันทึก + วาดภาพ AI ใหม่ทุกฉาก'}
             </span>
           </button>
         </div>
@@ -313,7 +334,6 @@ export default function ShotListView({
       {/* List of Editable Shots */}
       <div className="space-y-4">
         {editableShots.map((shot, idx) => {
-          const isSvg = !shot.image_url || shot.image_url.startsWith('data:image/svg+xml');
           const isRenderingThis = !!renderingIds[shot.id];
 
           return (
@@ -321,40 +341,21 @@ export default function ShotListView({
               key={shot.id || idx}
               className="studio-card rounded-2xl p-4 sm:p-5 grid grid-cols-1 lg:grid-cols-12 gap-4 items-start"
             >
-              {/* Left Column (3 cols): Shot Number, Preview Thumbnail & Camera Settings */}
+              {/* Left Column (3 cols): Scene #, Camera Angle & Duration */}
               <div className="lg:col-span-3 space-y-3">
                 <div className="flex items-center justify-between">
                   <span className="px-2.5 py-1 rounded-lg bg-amber-500 text-slate-950 font-mono font-black text-xs">
-                    SHOT {String(idx + 1).padStart(2, '0')}
+                    ฉากที่ {idx + 1}
                   </span>
                   <button
                     type="button"
                     onClick={() => handleRemoveShotRow(idx)}
                     className="p-1.5 rounded-lg text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 transition-colors cursor-pointer"
-                    title="ลบช็อตนี้"
+                    title="ลบฉากนี้"
                   >
                     <Trash2 className="w-4 h-4" />
                   </button>
                 </div>
-
-                {/* Mini Preview if committed */}
-                {!isDraftMode && (
-                  <div className="relative aspect-video rounded-xl overflow-hidden bg-[#090B0E] border border-slate-800">
-                    {!isSvg ? (
-                      <img src={shot.image_url} alt={shot.title} className="w-full h-full object-cover" />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center text-[11px] text-slate-500">
-                        ยังไม่มีภาพจริง
-                      </div>
-                    )}
-                    {isRenderingThis && (
-                      <div className="absolute inset-0 bg-black/75 flex items-center justify-center text-[11px] font-bold text-amber-300 gap-1.5">
-                        <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                        <span>กำลังวาดภาพ...</span>
-                      </div>
-                    )}
-                  </div>
-                )}
 
                 <div className="space-y-2">
                   <div>
@@ -371,17 +372,12 @@ export default function ShotListView({
                           {ang}
                         </option>
                       ))}
-                      {!CAMERA_ANGLES.includes(shot.camera_angle) && shot.camera_angle && (
-                        <option value={shot.camera_angle} className="bg-[#131720]">
-                          {shot.camera_angle}
-                        </option>
-                      )}
                     </select>
                   </div>
 
                   <div>
                     <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">
-                      ความยาวช็อต (วินาที)
+                      ความยาวฉาก (วินาที)
                     </label>
                     <input
                       type="number"
@@ -389,59 +385,88 @@ export default function ShotListView({
                       min="1"
                       max="15"
                       value={shot.duration_seconds || 3}
-                      onChange={(e) => handleFieldChange(idx, 'duration_seconds', parseFloat(e.target.value) || 3)}
+                      onChange={(e) =>
+                        handleFieldChange(idx, 'duration_seconds', parseFloat(e.target.value) || 3)
+                      }
                       className="w-full px-2.5 py-1.5 rounded-xl bg-[#0B0D11] border border-slate-800 text-xs text-slate-200 font-mono focus:outline-none focus:border-amber-500"
                     />
                   </div>
                 </div>
               </div>
 
-              {/* Middle Column (4 cols): Thai Title, Action Description & Dialogue */}
-              <div className="lg:col-span-4 space-y-3">
+              {/* Middle Column (5 cols): Title, What to Shoot, On-Screen Text, Voiceover */}
+              <div className="lg:col-span-5 space-y-3">
                 <div>
                   <label className="text-[11px] font-bold text-slate-300 block mb-1">
-                    ชื่อฉาก / ชื่อช็อต (ภาษาไทย)
+                    ชื่อฉาก
                   </label>
                   <input
                     type="text"
                     value={shot.title}
                     onChange={(e) => handleFieldChange(idx, 'title', e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl bg-[#0B0D11] border border-slate-800 focus:border-amber-500 text-xs font-bold text-white focus:outline-none"
+                    className="w-full px-3 py-1.5 rounded-xl bg-[#0B0D11] border border-slate-800 focus:border-amber-500 text-xs font-bold text-white focus:outline-none"
                   />
                 </div>
 
                 <div>
-                  <label className="text-[11px] font-bold text-slate-300 block mb-1">
-                    แอคชั่น / สิ่งที่เกิดขึ้นในฉาก (ภาษาไทย)
+                  <label className="text-[11px] font-bold text-sky-400 flex items-center gap-1 mb-1">
+                    <Camera className="w-3 h-3" />
+                    <span>ถ่ายอะไรบ้าง (Action)</span>
                   </label>
                   <textarea
-                    rows={3}
+                    rows={2}
                     value={shot.action_description}
                     onChange={(e) => handleFieldChange(idx, 'action_description', e.target.value)}
-                    className="w-full p-3 rounded-xl bg-[#0B0D11] border border-slate-800 focus:border-amber-500 text-xs text-slate-200 leading-relaxed focus:outline-none"
+                    className="w-full p-2.5 rounded-xl bg-[#0B0D11] border border-slate-800 focus:border-sky-400 text-xs text-slate-200 leading-relaxed focus:outline-none"
                   />
                 </div>
 
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <div>
+                    <label className="text-[11px] font-bold text-amber-400 flex items-center gap-1 mb-1">
+                      <Type className="w-3 h-3" />
+                      <span>ข้อความพาดหัวบนจอ</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={shot.on_screen_text || ''}
+                      onChange={(e) => handleFieldChange(idx, 'on_screen_text', e.target.value)}
+                      className="w-full px-2.5 py-1.5 rounded-xl bg-[#0B0D11] border border-slate-800 focus:border-amber-400 text-xs text-amber-200 focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[11px] font-bold text-slate-400 block mb-1">
+                      การเว้นที่ว่างในเฟรม
+                    </label>
+                    <input
+                      type="text"
+                      value={shot.live_action_guide || ''}
+                      onChange={(e) => handleFieldChange(idx, 'live_action_guide', e.target.value)}
+                      className="w-full px-2.5 py-1.5 rounded-xl bg-[#0B0D11] border border-slate-800 focus:border-amber-400 text-xs text-slate-300 focus:outline-none"
+                    />
+                  </div>
+                </div>
+
                 <div>
-                  <label className="text-[11px] font-bold text-slate-400 block mb-1">
-                    บทพูด / เสียงประกอบ ASMR (ถ้ามี)
+                  <label className="text-[11px] font-bold text-emerald-400 flex items-center gap-1 mb-1">
+                    <Volume2 className="w-3 h-3" />
+                    <span>เสียงพากย์ (Voiceover)</span>
                   </label>
-                  <input
-                    type="text"
+                  <textarea
+                    rows={2}
                     value={shot.dialogue_script}
                     onChange={(e) => handleFieldChange(idx, 'dialogue_script', e.target.value)}
-                    placeholder="เช่น เสียงปิดประตูรถแน่นทุ้ม, เสียงพูด..."
-                    className="w-full px-3 py-1.5 rounded-xl bg-[#0B0D11] border border-slate-800 focus:border-amber-500 text-xs text-slate-300 focus:outline-none"
+                    className="w-full p-2.5 rounded-xl bg-[#0B0D11] border border-slate-800 focus:border-emerald-400 text-xs text-emerald-100 leading-relaxed focus:outline-none"
                   />
                 </div>
               </div>
 
-              {/* Right Column (5 cols): English Image Prompt (for FLUX.1 / Midjourney) */}
-              <div className="lg:col-span-5 space-y-3">
+              {/* Right Column (4 cols): English Image Prompt */}
+              <div className="lg:col-span-4 space-y-2.5">
                 <div className="flex items-center justify-between">
                   <label className="text-[11px] font-mono font-bold text-amber-400 flex items-center gap-1.5">
                     <Film className="w-3.5 h-3.5" />
-                    <span>PROMPT ภาษาอังกฤษสำหรับวาดภาพ AI (FLUX.1)</span>
+                    <span>AI IMAGE PROMPT (EN)</span>
                   </label>
 
                   {!isDraftMode && !shot.isNew && (
@@ -452,7 +477,7 @@ export default function ShotListView({
                       className="px-2.5 py-1 rounded-lg bg-amber-500/15 hover:bg-amber-500/30 border border-amber-500/40 text-amber-300 text-[11px] font-bold flex items-center gap-1 cursor-pointer"
                     >
                       <RefreshCw className={`w-3 h-3 ${isRenderingThis ? 'animate-spin' : ''}`} />
-                      <span>วาดช็อตนี้ใหม่</span>
+                      <span>วาดฉากนี้ใหม่</span>
                     </button>
                   )}
                 </div>
@@ -461,13 +486,8 @@ export default function ShotListView({
                   rows={5}
                   value={shot.content}
                   onChange={(e) => handleFieldChange(idx, 'content', e.target.value)}
-                  placeholder="Macro close-up shot, hyper-realistic, soft natural daylight..."
                   className="w-full p-3 rounded-xl bg-[#07090D] border border-slate-800 focus:border-amber-500 text-xs font-mono text-amber-100/90 leading-relaxed focus:outline-none"
                 />
-
-                <p className="text-[11px] text-slate-400">
-                  💡 สามารถแก้ไขคำสั่ง Prompt ภาษาอังกฤษด้านบนให้ตรงใจที่สุด แล้วกดปุ่มสีส้มด้านบนเพื่อสั่งวาดภาพจริงพร้อมกันทุกช็อตได้เลยครับ
-                </p>
               </div>
             </div>
           );
