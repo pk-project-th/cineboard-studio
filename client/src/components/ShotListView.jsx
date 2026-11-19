@@ -165,25 +165,25 @@ export default function ShotListView({
     }
   };
 
-  // PRINTABLE PRODUCTION TABLE VIEW
+  // PRINTABLE PRODUCTION TABLE VIEW (Desktop Table + iPhone 17 Symmetrical Card List)
   if (mode === 'shotlist' && !isDraftMode) {
     return (
-      <div className="p-4 sm:p-6 lg:p-8 space-y-5 max-w-[1440px] mx-auto">
+      <div className="p-4 sm:p-6 lg:p-8 pb-28 lg:pb-10 space-y-5 max-w-[1360px] mx-auto">
         <div className="editorial-card p-4 sm:p-5 rounded-2xl flex flex-wrap items-center justify-between gap-3 no-print">
           <div>
             <h2 className="text-base font-extrabold">
               {isPhoto
-                ? 'ตารางสรุปเซ็ตภาพนิ่งระดับช่างภาพโลก (Photo Shooting Sheet)'
-                : 'ตารางสรุปแผนถ่ายทำวิดีโอไวรัล (Video Shooting Sheet)'}
+                ? 'ตารางสรุปเซ็ตภาพนิ่งระดับช่างภาพโลก'
+                : 'ตารางสรุปแผนถ่ายทำวิดีโอไวรัล'}
             </h2>
             <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
-              สรุปครบทุกช็อตในหน้าเดียว พร้อมสั่งพิมพ์หรือบันทึกเป็นไฟล์ PDF ได้ทันที
+              สรุปครบทุกช็อตในหน้าเดียว พร้อมสั่งพิมพ์หรือบันทึกเป็น PDF ได้ทันที
             </p>
           </div>
           <button
             type="button"
             onClick={onBackToBoard}
-            className="btn-tactile px-3.5 py-2 rounded-xl border text-xs font-bold flex items-center gap-1.5 cursor-pointer"
+            className="btn-tactile min-h-[40px] px-3.5 py-2 rounded-xl border text-xs font-bold flex items-center gap-1.5 cursor-pointer"
             style={{ backgroundColor: 'var(--bg-elevated)', borderColor: 'var(--border-strong)' }}
           >
             <ArrowLeft className="w-3.5 h-3.5" />
@@ -191,7 +191,43 @@ export default function ShotListView({
           </button>
         </div>
 
-        <div className="editorial-card overflow-x-auto rounded-2xl">
+        {/* Mobile / iPhone 17 Clean Stacked Summary Cards */}
+        <div className="md:hidden space-y-3">
+          {editableShots.map((s, idx) => (
+            <div key={s.id || idx} className="editorial-card rounded-2xl p-4 space-y-2.5 text-xs">
+              <div className="flex items-center justify-between gap-2">
+                <span className="px-2.5 py-0.5 rounded-lg bg-amber-600 text-white font-mono font-extrabold">
+                  {isPhoto ? `ภาพที่ ${idx + 1}` : `ฉากที่ ${idx + 1} (${s.duration_seconds || 2.5} วิ)`}
+                </span>
+                <span className="text-[11px] font-bold text-sky-700 dark:text-sky-400">
+                  {s.camera_angle}
+                </span>
+              </div>
+              <div className="font-extrabold text-sm">{s.title}</div>
+              {isPhoto && s.master_photographer && (
+                <div className="text-[11px] font-bold text-amber-700 dark:text-amber-300">
+                  🏆 {s.master_photographer}
+                </div>
+              )}
+              <p className="leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
+                {isPhoto ? (s.depth_technique || s.action_description) : s.action_description}
+              </p>
+              {s.on_screen_text && (
+                <div className="p-2 rounded-lg border font-bold text-amber-700 dark:text-amber-300" style={{ backgroundColor: 'var(--bg-elevated)', borderColor: 'var(--border-subtle)' }}>
+                  🔤 “{s.on_screen_text}”
+                </div>
+              )}
+              {!isPhoto && s.dialogue_script && (
+                <div className="p-2 rounded-lg border text-emerald-700 dark:text-emerald-300 leading-relaxed" style={{ backgroundColor: 'var(--bg-elevated)', borderColor: 'var(--border-subtle)' }}>
+                  🎙️ {s.dialogue_script}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+
+        {/* Desktop Production Table */}
+        <div className="hidden md:block editorial-card overflow-x-auto rounded-2xl">
           <table className="w-full text-left border-collapse">
             <thead>
               <tr
@@ -271,7 +307,7 @@ export default function ShotListView({
 
   // BULK EDITOR MODE
   return (
-    <div className="p-4 sm:p-6 lg:p-8 space-y-5 max-w-6xl mx-auto">
+    <div className="p-4 sm:p-6 lg:p-8 pb-28 lg:pb-10 space-y-5 max-w-6xl mx-auto">
       <div className="sticky top-16 z-30 editorial-card p-4 rounded-2xl flex flex-wrap items-center justify-between gap-3 shadow-lg">
         <div className="space-y-1">
           <div className="flex items-center gap-2">

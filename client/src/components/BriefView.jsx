@@ -14,38 +14,40 @@ import {
   Flame
 } from 'lucide-react';
 
+// Strictly 4 balanced 2x2 lifestyle presets per mode (Zero ragged orphan pills!)
 const PHOTO_QUICK_IDEAS = [
   {
     id: 'photo_cafe',
-    badge: '☕ คาเฟ่ไลฟ์สไตล์ (เซ็ต IG 6 รูป)',
+    icon: '☕',
+    title: 'คาเฟ่ไลฟ์สไตล์',
+    sub: 'เซ็ต IG 6 มุม',
     aspect: '4:5',
     shots: 6,
     text: 'ไปนั่งคาเฟ่แสงสวยสไตล์มินิมอล สั่งมัทฉะกับขนมโฮมเมด อยากได้เซ็ตภาพนิ่งลง IG Carousel ที่ดูแพง มีมิติและเป็นธรรมชาติ'
   },
   {
     id: 'photo_temple',
-    badge: '⛩️ เที่ยววัด / เมืองเก่าแสงเย็น',
+    icon: '⛩️',
+    title: 'วัด / เมืองเก่าแสงเย็น',
+    sub: 'แสงเงาสไตล์ Fan Ho',
     aspect: '4:5',
     shots: 6,
     text: 'เดินเล่นถ่ายรูปที่วัดอรุณและย่านเมืองเก่าช่วง 5 โมงเย็น แสงสีทองสวยมาก อยากได้รูปแนวไลฟ์สไตล์เท่ๆ มีมิติแสงเงา'
   },
   {
     id: 'photo_beach',
-    badge: '🏖️ ทะเล / พูลวิลล่า OOTD',
+    icon: '🏖️',
+    title: 'ทะเล / พูลวิลล่า',
+    sub: 'OOTD ไม่เกร็งกล้อง',
     aspect: '4:5',
     shots: 6,
     text: 'ไปเที่ยวทะเลหัวหินพักพูลวิลล่า ช่วงบ่ายแก่ถึงพระอาทิตย์ตก อยากได้มุมถ่ายรูปไลฟ์สไตล์ริมทะเลแบบไม่เกร็งกล้อง'
   },
   {
-    id: 'photo_street',
-    badge: '🚶 เดินเล่นย่านฮิป / สตรีทไลฟ์สไตล์',
-    aspect: '4:5',
-    shots: 5,
-    text: 'เดินเล่นถ่ายรูปไลฟ์สไตล์ย่านทรงวาดกับเพื่อน แวะร้านหนังสือ ร้านกาแฟ และตึกวินเทจสวยๆ'
-  },
-  {
     id: 'photo_camp',
-    badge: '🏕️ แคมป์ปิ้ง / ภูเขาหมอกเช้า',
+    icon: '🏕️',
+    title: 'แคมป์ปิ้ง / ภูเขา',
+    sub: 'ฟีลนิตยสาร Kinfolk',
     aspect: '4:5',
     shots: 6,
     text: 'ทริปแคมป์ปิ้งดริปกาแฟกลางหมอกเช้าบนดอย อยากได้เซ็ตภาพนิ่งฟีลอบอุ่นเหมือนนิตยสาร Kinfolk'
@@ -55,38 +57,39 @@ const PHOTO_QUICK_IDEAS = [
 const VIDEO_QUICK_IDEAS = [
   {
     id: 'vid_cafe',
-    badge: '☕ ป้ายยาคาเฟ่ลับ (ไวรัล 15 วิ)',
+    icon: '☕',
+    title: 'ป้ายยาคาเฟ่ลับ',
+    sub: 'ไวรัลกระชับ 15 วิ',
     aspect: '9:16',
     shots: 5,
     text: 'แวะคาเฟ่ลับสวนญี่ปุ่น มัทฉะอร่อยและแสงสวยทุกมุม อยากถ่ายคลิปสั้นไลฟ์สไตล์ลง TikTok ให้คนอยากกดเซฟตามรอย'
   },
   {
     id: 'vid_temple',
-    badge: '⛩️ เที่ยววัดแสงเย็น (POV 18 วิ)',
+    icon: '⛩️',
+    title: 'เที่ยววัดแสงเย็น',
+    sub: 'POV เล่าเรื่อง 18 วิ',
     aspect: '9:16',
     shots: 6,
     text: 'ไปเที่ยววัดอรุณช่วงเย็น 5 โมง แสงพระอาทิตย์ตกสวยมาก อยากถ่ายคลิปพาชมมุมลับและจุดถ่ายรูปเช็กอิน'
   },
   {
     id: 'vid_beach',
-    badge: '🏖️ ทริปทะเล & ที่พัก (Mini-Vlog)',
+    icon: '🏖️',
+    title: 'ทริปทะเล & ที่พัก',
+    sub: 'Mini-Vlog ฮีลใจ',
     aspect: '9:16',
     shots: 6,
     text: 'ทริปเที่ยวทะเลพักพูลวิลล่าริมหาด เปิดห้องเจอวิวทะเล เดินเล่นรับลมเย็นๆ แบบ Mini-Vlog ไลฟ์สไตล์ชิลล์ๆ'
   },
   {
     id: 'vid_food',
-    badge: '🍜 ตะลุยของกินกลางคืน',
+    icon: '🍜',
+    title: 'ตะลุยของกินกลางคืน',
+    sub: 'รีวิวสไตล์เพื่อนเล่า',
     aspect: '9:16',
     shots: 5,
     text: 'เดินเที่ยวถนนคนเดินหาของกินสตรีทฟู้ดร้านเด็ด ย่างสดควันหอมฉุย รีวิวสไตล์เพื่อนชวนกิน'
-  },
-  {
-    id: 'vid_camp',
-    badge: '🏕️ หนีงานไปแคมป์ปิ้งฮีลใจ',
-    aspect: '9:16',
-    shots: 6,
-    text: 'ขับรถหนีความวุ่นวายไปกางเต็นท์ริมน้ำ ดริปกาแฟรับลมหนาวตอนเช้า ถ่ายคลิปฟีลฮีลใจไวรัล'
   }
 ];
 
@@ -105,9 +108,9 @@ const PHOTO_STYLE_MOODS = [
 ];
 
 const VIDEO_DURATION_PRESETS = [
-  { label: '⚡ 15 วิ', shots: 5, desc: 'ไวรัลกระชับ' },
-  { label: '🎬 18 วิ', shots: 6, desc: 'เล่าเรื่องครบ' },
-  { label: '🌟 24 วิ', shots: 8, desc: 'Mini-Vlog เต็มอิ่ม' }
+  { label: '⚡ 15 วิ', shots: 5, desc: '5 ฉาก กระชับ' },
+  { label: '🎬 18 วิ', shots: 6, desc: '6 ฉาก ลงตัว' },
+  { label: '🌟 24 วิ', shots: 8, desc: '8 ฉาก เต็มอิ่ม' }
 ];
 
 const PHOTO_COUNT_PRESETS = [
@@ -233,21 +236,28 @@ export default function BriefView({
 
   return (
     <aside
-      className="w-full lg:w-[390px] xl:w-[420px] shrink-0 border-b lg:border-b-0 lg:border-r flex flex-col lg:h-[calc(100dvh-3.5rem)] lg:sticky lg:top-14 overflow-y-auto no-print transition-colors"
+      className="w-full lg:w-[400px] xl:w-[420px] shrink-0 lg:border-r flex flex-col lg:h-[calc(100dvh-3.5rem)] lg:sticky lg:top-14 overflow-y-auto no-print transition-colors"
       style={{
         backgroundColor: 'var(--bg-surface)',
         borderColor: 'var(--border-subtle)'
       }}
     >
-      <div className="p-4 sm:p-5 space-y-5 flex-1">
-        {/* DUAL MODE SWITCHER (ภาพนิ่งระดับโลก vs วิดีโอไวรัลไลฟ์สไตล์) */}
+      {/* Centered max-w-lg on iPhone 17 / Tablet for immaculate visual symmetry */}
+      <div className="p-4 sm:p-5 pb-28 lg:pb-6 space-y-5 flex-1 w-full max-w-lg mx-auto lg:max-w-none">
+        {/* DUAL MODE SWITCHER (Symmetrical 2-Column Equal Tiles) */}
         <div className="space-y-2">
-          <span
-            className="text-[11px] font-bold uppercase tracking-wider block"
-            style={{ color: 'var(--text-muted)' }}
-          >
-            เลือกประเภทสตอรี่บอร์ดที่ต้องการ
-          </span>
+          <div className="flex items-center justify-between">
+            <span
+              className="text-[11px] font-bold uppercase tracking-wider"
+              style={{ color: 'var(--text-muted)' }}
+            >
+              เลือกประเภทสตอรี่บอร์ด
+            </span>
+            <span className="text-[11px] font-semibold text-amber-600">
+              {isPhoto ? '📸 โหมดภาพนิ่ง' : '🎬 โหมดวิดีโอ'}
+            </span>
+          </div>
+
           <div
             className="grid grid-cols-2 gap-1.5 p-1.5 rounded-2xl border"
             style={{
@@ -258,11 +268,11 @@ export default function BriefView({
             <button
               type="button"
               onClick={() => handleModeSwitch('photo')}
-              className={`btn-tactile min-h-[54px] px-3 py-2 rounded-xl text-left flex flex-col justify-center gap-0.5 cursor-pointer transition-all ${
+              className={`btn-tactile min-h-[58px] px-3 py-2 rounded-xl flex flex-col items-center justify-center text-center gap-0.5 cursor-pointer transition-all ${
                 isPhoto
                   ? darkMode
-                    ? 'bg-amber-500 text-zinc-950 shadow-md'
-                    : 'bg-zinc-900 text-white shadow-md'
+                    ? 'bg-amber-500 text-zinc-950 shadow-sm'
+                    : 'bg-zinc-900 text-white shadow-sm'
                   : 'hover:bg-black/5'
               }`}
             >
@@ -270,23 +280,19 @@ export default function BriefView({
                 <Camera className="w-4 h-4 shrink-0" />
                 <span>ภาพนิ่ง (Photo)</span>
               </div>
-              <span
-                className={`text-[10px] leading-tight ${
-                  isPhoto ? 'opacity-85' : 'opacity-65'
-                }`}
-              >
-                เรฟช่างภาพโลก • มิติ & ความหมาย
+              <span className={`text-[10px] leading-tight ${isPhoto ? 'opacity-85' : 'opacity-65'}`}>
+                เรฟช่างภาพโลก • มิติ
               </span>
             </button>
 
             <button
               type="button"
               onClick={() => handleModeSwitch('video')}
-              className={`btn-tactile min-h-[54px] px-3 py-2 rounded-xl text-left flex flex-col justify-center gap-0.5 cursor-pointer transition-all ${
+              className={`btn-tactile min-h-[58px] px-3 py-2 rounded-xl flex flex-col items-center justify-center text-center gap-0.5 cursor-pointer transition-all ${
                 !isPhoto
                   ? darkMode
-                    ? 'bg-amber-500 text-zinc-950 shadow-md'
-                    : 'bg-zinc-900 text-white shadow-md'
+                    ? 'bg-amber-500 text-zinc-950 shadow-sm'
+                    : 'bg-zinc-900 text-white shadow-sm'
                   : 'hover:bg-black/5'
               }`}
             >
@@ -294,20 +300,16 @@ export default function BriefView({
                 <Film className="w-4 h-4 shrink-0" />
                 <span>วิดีโอ (Viral Video)</span>
               </div>
-              <span
-                className={`text-[10px] leading-tight ${
-                  !isPhoto ? 'opacity-85' : 'opacity-65'
-                }`}
-              >
-                คลิปไลฟ์สไตล์ไวรัล • พากย์ & เวลา
+              <span className={`text-[10px] leading-tight ${!isPhoto ? 'opacity-85' : 'opacity-65'}`}>
+                ไวรัลไลฟ์สไตล์ • พากย์
               </span>
             </button>
           </div>
         </div>
 
-        {/* Mode Highlight Banner */}
+        {/* Mode Info Callout */}
         <div
-          className="p-3 rounded-xl border text-xs leading-relaxed flex items-start gap-2.5"
+          className="p-3.5 rounded-2xl border text-xs leading-relaxed flex items-start gap-2.5"
           style={{
             backgroundColor: darkMode ? 'rgba(245, 158, 11, 0.08)' : '#FFFBEB',
             borderColor: darkMode ? 'rgba(245, 158, 11, 0.25)' : '#FDE68A'
@@ -321,33 +323,31 @@ export default function BriefView({
           <div style={{ color: darkMode ? '#FDE68A' : '#78350F' }}>
             {isPhoto ? (
               <>
-                <span className="font-bold block">โหมดสตอรี่บอร์ดภาพนิ่งระดับช่างภาพโลก</span>
+                <span className="font-bold block">สตอรี่บอร์ดภาพนิ่งระดับช่างภาพโลก</span>
                 <span className="text-[11px] opacity-90">
-                  อ้างอิงเทคนิคจาก Fan Ho, Saul Leiter, Steve McCurry, Cartier-Bresson & Peter Lindbergh เพื่อสร้างมิติ แสงเงา และความหมายในทุกภาพ
+                  อ้างอิงมุมและแสงเงาจาก Fan Ho, Saul Leiter, Steve McCurry, Cartier-Bresson & Peter Lindbergh
                 </span>
               </>
             ) : (
               <>
-                <span className="font-bold block">โหมดวิดีโอไวรัลไลฟ์สไตล์ (TikTok / Reels)</span>
+                <span className="font-bold block">สตอรี่บอร์ดวิดีโอไวรัลไลฟ์สไตล์</span>
                 <span className="text-[11px] opacity-90">
-                  วางแผนครบ กี่ฉาก ฉากละกี่วิ มุมกล้อง จุดเชื่อมฉาก โซนเว้นข้อความหลบปุ่ม TikTok และบทพากย์พร้อมกดฟังเสียงได้ทันที
+                  วางแผนครบ กี่ฉาก ฉากละกี่วิ มุมกล้อง จุดเชื่อมฉาก โซนเว้นข้อความหลบปุ่ม TikTok และบทพากย์
                 </span>
               </>
             )}
           </div>
         </div>
 
-        {/* STEP 1: Topic / Lifestyle Location */}
-        <div className="space-y-2">
+        {/* STEP 1: Topic / Location */}
+        <div className="space-y-2.5">
           <div className="flex items-center justify-between gap-2">
-            <label className="text-xs font-bold flex items-center gap-1.5">
-              <span className="w-5 h-5 rounded-full bg-amber-600 text-white font-extrabold text-[11px] flex items-center justify-center">
+            <label className="text-xs font-bold flex items-center gap-2">
+              <span className="w-5 h-5 rounded-full bg-amber-600 text-white font-extrabold text-[11px] flex items-center justify-center shrink-0">
                 1
               </span>
               <span>
-                {isPhoto
-                  ? 'อยากถ่ายภาพนิ่งไลฟ์สไตล์ที่ไหน / แนวอะไร?'
-                  : 'อยากถ่ายวิดีโอไลฟ์สไตล์ที่ไหน / เรื่องอะไร?'}
+                {isPhoto ? 'สถานที่หรือแนวภาพนิ่งที่อยากถ่าย' : 'สถานที่หรือโจทย์วิดีโอที่อยากถ่าย'}
               </span>
             </label>
 
@@ -355,13 +355,13 @@ export default function BriefView({
               <button
                 type="button"
                 onClick={handlePasteFromClipboard}
-                className="btn-tactile px-2 py-1 rounded-lg border text-[11px] font-semibold flex items-center gap-1 cursor-pointer"
+                className="btn-tactile h-8 px-2.5 rounded-lg border text-[11px] font-semibold flex items-center gap-1 cursor-pointer"
                 style={{
                   backgroundColor: 'var(--bg-subtle)',
                   borderColor: 'var(--border-subtle)'
                 }}
               >
-                <ClipboardPaste className="w-3 h-3 text-amber-600" />
+                <ClipboardPaste className="w-3.5 h-3.5 text-amber-600" />
                 <span>{pasteSuccess ? 'วางแล้ว!' : 'วาง'}</span>
               </button>
               {storyConcept && (
@@ -369,7 +369,7 @@ export default function BriefView({
                   type="button"
                   onClick={() => updateConcept('')}
                   title="ล้างข้อความ"
-                  className="p-1.5 rounded-lg text-rose-500 hover:bg-rose-500/10 cursor-pointer"
+                  className="btn-tactile h-8 w-8 flex items-center justify-center rounded-lg text-rose-500 hover:bg-rose-500/10 cursor-pointer"
                 >
                   <Trash2 className="w-3.5 h-3.5" />
                 </button>
@@ -383,10 +383,10 @@ export default function BriefView({
             rows={4}
             placeholder={
               isPhoto
-                ? "เช่น 'ไปคาเฟ่แสงสวยย่านอารีย์', 'เดินเล่นถ่ายรูปวัดอรุณตอนเย็น', 'เที่ยวทะเลหัวหินอยากได้รูปลง IG'..."
+                ? "เช่น 'ไปคาเฟ่แสงสวยย่านอารีย์', 'เดินถ่ายรูปวัดอรุณตอนเย็น', 'เที่ยวทะเลหัวหินอยากได้รูปลง IG'..."
                 : "เช่น 'แวะคาเฟ่ลับสวนญี่ปุ่น', 'ไปเที่ยววัดอรุณตอน 5 โมงเย็น', 'ทริปทะเลกับเพื่อนลง TikTok'..."
             }
-            className={`w-full p-3.5 rounded-xl border text-sm leading-relaxed resize-y focus:outline-none transition-colors ${
+            className={`w-full p-3.5 rounded-2xl border text-sm leading-relaxed resize-y focus:outline-none transition-colors ${
               errorMsg ? 'border-rose-500' : 'focus:border-amber-600'
             }`}
             style={{
@@ -397,13 +397,11 @@ export default function BriefView({
           />
 
           {errorMsg && (
-            <p className="text-xs text-rose-600 font-semibold flex items-center gap-1">
-              <span>⚠️ {errorMsg}</span>
-            </p>
+            <p className="text-xs text-rose-600 font-semibold">⚠️ {errorMsg}</p>
           )}
 
-          {/* Quick Lifestyle Ideas */}
-          <div className="space-y-1.5 pt-1">
+          {/* Symmetrical 2x2 Lifestyle Quick Ideas Grid */}
+          <div className="space-y-2 pt-0.5">
             <span
               className="text-[11px] font-semibold flex items-center gap-1"
               style={{ color: 'var(--text-muted)' }}
@@ -411,42 +409,49 @@ export default function BriefView({
               <MapPin className="w-3 h-3 text-amber-600" />
               <span>หรือจิ้มเลือกโจทย์ไลฟ์สไตล์ยอดนิยม:</span>
             </span>
-            <div className="flex flex-wrap gap-1.5">
+            <div className="grid grid-cols-2 gap-2">
               {quickIdeas.map((idea) => (
                 <button
                   key={idea.id}
                   type="button"
                   onClick={() => handleApplyQuickIdea(idea)}
-                  className="btn-tactile px-2.5 py-1.5 rounded-lg border text-[11px] font-semibold hover:border-amber-500 transition-all cursor-pointer text-left"
+                  className="btn-tactile min-h-[54px] p-2.5 rounded-xl border text-left hover:border-amber-500 transition-all cursor-pointer flex items-start gap-2"
                   style={{
                     backgroundColor: 'var(--bg-elevated)',
-                    borderColor: 'var(--border-subtle)',
-                    color: 'var(--text-secondary)'
+                    borderColor: 'var(--border-subtle)'
                   }}
                 >
-                  {idea.badge}
+                  <span className="text-base leading-none mt-0.5 shrink-0">{idea.icon}</span>
+                  <div className="min-w-0">
+                    <div className="text-[11px] font-bold truncate" style={{ color: 'var(--text-primary)' }}>
+                      {idea.title}
+                    </div>
+                    <div className="text-[10px] truncate mt-0.5" style={{ color: 'var(--text-muted)' }}>
+                      {idea.sub}
+                    </div>
+                  </div>
                 </button>
               ))}
             </div>
           </div>
         </div>
 
-        {/* STEP 2: Shot Count & Format */}
+        {/* STEP 2: Shot Count & Aspect Ratio (Symmetrical 3-Col + 2-Col) */}
         <div
-          className="p-3.5 rounded-2xl border space-y-3"
+          className="p-4 rounded-2xl border space-y-3"
           style={{
             backgroundColor: 'var(--bg-elevated)',
             borderColor: 'var(--border-subtle)'
           }}
         >
           <div className="flex items-center justify-between gap-2">
-            <label className="text-xs font-bold flex items-center gap-1.5">
-              <span className="w-5 h-5 rounded-full bg-amber-600 text-white font-extrabold text-[11px] flex items-center justify-center">
+            <label className="text-xs font-bold flex items-center gap-2">
+              <span className="w-5 h-5 rounded-full bg-amber-600 text-white font-extrabold text-[11px] flex items-center justify-center shrink-0">
                 2
               </span>
-              <span>{isPhoto ? 'จำนวนภาพ & สัดส่วนภาพ' : 'ความยาวคลิป & จำนวนฉาก'}</span>
+              <span>{isPhoto ? 'จำนวนภาพ & สัดส่วน' : 'ความยาว & จำนวนฉาก'}</span>
             </label>
-            <span className="px-2 py-0.5 rounded-md bg-emerald-500/15 text-emerald-700 text-[11px] font-bold flex items-center gap-1">
+            <span className="px-2 py-0.5 rounded-lg bg-emerald-500/12 text-emerald-700 dark:text-emerald-300 text-[11px] font-bold flex items-center gap-1">
               {isPhoto ? (
                 <span>{effectiveCount} มุมภาพ</span>
               ) : (
@@ -460,7 +465,7 @@ export default function BriefView({
             </span>
           </div>
 
-          <div className="grid grid-cols-3 gap-1.5">
+          <div className="grid grid-cols-3 gap-2">
             {countPresets.map((preset) => {
               const active = effectiveCount === preset.shots;
               return (
@@ -468,17 +473,15 @@ export default function BriefView({
                   key={preset.shots}
                   type="button"
                   onClick={() => setSelectedShotCount(preset.shots)}
-                  className={`btn-tactile p-2 rounded-xl border text-left cursor-pointer ${
-                    active
-                      ? 'border-amber-600 bg-amber-500/10'
-                      : 'hover:border-amber-500/40'
+                  className={`btn-tactile min-h-[52px] p-2 rounded-xl border text-center flex flex-col items-center justify-center cursor-pointer ${
+                    active ? 'border-amber-600 bg-amber-500/10' : 'hover:border-amber-500/40'
                   }`}
                   style={{
                     backgroundColor: active ? undefined : 'var(--bg-surface)',
                     borderColor: active ? '#D97706' : 'var(--border-subtle)'
                   }}
                 >
-                  <div className={`text-xs font-extrabold ${active ? 'text-amber-700' : ''}`}>
+                  <div className={`text-xs font-extrabold ${active ? 'text-amber-700 dark:text-amber-300' : ''}`}>
                     {preset.label}
                   </div>
                   <div className="text-[10px] mt-0.5" style={{ color: 'var(--text-muted)' }}>
@@ -489,10 +492,10 @@ export default function BriefView({
             })}
           </div>
 
-          {/* Stepper & Aspect Ratio */}
-          <div className="flex items-center justify-between gap-2 pt-0.5">
+          {/* Symmetrical Stepper + Aspect Ratio Row */}
+          <div className="grid grid-cols-2 gap-2 pt-0.5">
             <div
-              className="flex items-center rounded-xl border p-0.5"
+              className="h-10 flex items-center justify-between rounded-xl border px-1"
               style={{
                 backgroundColor: 'var(--bg-surface)',
                 borderColor: 'var(--border-subtle)'
@@ -506,7 +509,7 @@ export default function BriefView({
               >
                 <Minus className="w-3.5 h-3.5" />
               </button>
-              <span className="px-2.5 text-xs font-extrabold text-amber-600">
+              <span className="text-xs font-extrabold text-amber-600">
                 {effectiveCount} {isPhoto ? 'ภาพ' : 'ฉาก'}
               </span>
               <button
@@ -520,8 +523,9 @@ export default function BriefView({
             </div>
 
             <div
-              className="flex items-center rounded-xl border p-0.5"
+              className="h-10 grid gap-1 p-1 rounded-xl border"
               style={{
+                gridTemplateColumns: isPhoto ? 'repeat(3, 1fr)' : 'repeat(2, 1fr)',
                 backgroundColor: 'var(--bg-surface)',
                 borderColor: 'var(--border-subtle)'
               }}
@@ -531,7 +535,7 @@ export default function BriefView({
                   key={ratio}
                   type="button"
                   onClick={() => setAspectRatio(ratio)}
-                  className={`px-2.5 py-1.5 rounded-lg text-[11px] font-bold cursor-pointer transition-all ${
+                  className={`rounded-lg text-[11px] font-bold cursor-pointer transition-all flex items-center justify-center ${
                     aspectRatio === ratio
                       ? darkMode
                         ? 'bg-amber-500 text-zinc-950'
@@ -539,24 +543,22 @@ export default function BriefView({
                       : 'opacity-65 hover:opacity-100'
                   }`}
                 >
-                  {ratio === '4:5' ? '4:5 IG' : ratio === '9:16' ? '9:16 แนวตั้ง' : ratio}
+                  {ratio === '9:16' ? '9:16' : ratio}
                 </button>
               ))}
             </div>
           </div>
         </div>
 
-        {/* STEP 3: Mood / Viral Angle */}
+        {/* STEP 3: Style / Viral Formula (Symmetrical 2x2 Grid) */}
         <div className="space-y-2">
-          <label className="text-xs font-bold flex items-center gap-1.5">
-            <span className="w-5 h-5 rounded-full bg-amber-600 text-white font-extrabold text-[11px] flex items-center justify-center">
+          <label className="text-xs font-bold flex items-center gap-2">
+            <span className="w-5 h-5 rounded-full bg-amber-600 text-white font-extrabold text-[11px] flex items-center justify-center shrink-0">
               3
             </span>
-            <span>
-              {isPhoto ? 'โทนภาพ & สไตล์ช่างภาพหลัก' : 'สูตรคอนเทนต์ไวรัลไลฟ์สไตล์'}
-            </span>
+            <span>{isPhoto ? 'โทนภาพ & สไตล์ช่างภาพหลัก' : 'สูตรคอนเทนต์ไวรัลไลฟ์สไตล์'}</span>
           </label>
-          <div className="grid grid-cols-2 gap-1.5">
+          <div className="grid grid-cols-2 gap-2">
             {styleOptions.map((opt) => {
               const active = selectedStyle === opt.id;
               return (
@@ -564,8 +566,8 @@ export default function BriefView({
                   key={opt.id}
                   type="button"
                   onClick={() => setSelectedStyle(opt.id)}
-                  className={`btn-tactile px-2.5 py-2 rounded-xl text-[11px] font-semibold border text-left cursor-pointer ${
-                    active ? 'border-amber-600 bg-amber-500/10 text-amber-700 font-bold' : ''
+                  className={`btn-tactile min-h-[44px] px-3 py-2 rounded-xl text-[11px] font-semibold border text-left flex items-center cursor-pointer ${
+                    active ? 'border-amber-600 bg-amber-500/10 text-amber-700 dark:text-amber-300 font-bold' : ''
                   }`}
                   style={{
                     backgroundColor: active ? undefined : 'var(--bg-elevated)',
@@ -579,9 +581,9 @@ export default function BriefView({
           </div>
         </div>
 
-        {/* Fast vs Auto AI Image Toggle */}
+        {/* Auto AI Image Option */}
         <label
-          className="flex items-center justify-between gap-3 p-3 rounded-xl border cursor-pointer"
+          className="flex items-center justify-between gap-3 p-3.5 rounded-2xl border cursor-pointer"
           style={{
             backgroundColor: 'var(--bg-elevated)',
             borderColor: 'var(--border-subtle)'
@@ -589,25 +591,25 @@ export default function BriefView({
         >
           <div className="space-y-0.5">
             <span className="text-xs font-bold block">วาดภาพตัวอย่าง AI ให้อัตโนมัติทันที</span>
-            <span className="text-[11px] block" style={{ color: 'var(--text-muted)' }}>
-              หากปิดไว้จะได้แผนภาพไกด์จัดเฟรมทันทีใน 1 วิ (เหมาะตอนอยู่นอกสถานที่เน็ตช้า) แล้วค่อยกดวาดเฉพาะช็อตที่ต้องการได้
+            <span className="text-[11px] block leading-snug" style={{ color: 'var(--text-muted)' }}>
+              ปิดไว้จะได้แผนภาพไกด์จัดเฟรมทันทีใน 1 วิ (ประหยัดเน็ตมือถือ) แล้วค่อยกดวาดเฉพาะช็อตที่ชอบ
             </span>
           </div>
           <input
             type="checkbox"
             checked={autoRenderImages}
             onChange={(e) => setAutoRenderImages(e.target.checked)}
-            className="w-4 h-4 accent-amber-600 rounded cursor-pointer shrink-0"
+            className="w-5 h-5 accent-amber-600 rounded cursor-pointer shrink-0"
           />
         </label>
 
-        {/* Primary & Secondary Actions */}
-        <div className="space-y-2 pt-1">
+        {/* Symmetrical Primary & Secondary CTAs */}
+        <div className="space-y-2.5 pt-1">
           <button
             type="button"
             disabled={isPlanning}
             onClick={() => handleSubmit(false)}
-            className="btn-tactile min-h-[48px] w-full py-3 px-4 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-extrabold text-sm shadow-md shadow-amber-600/20 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+            className="btn-tactile min-h-[50px] w-full py-3 px-4 rounded-2xl bg-amber-600 hover:bg-amber-700 text-white font-extrabold text-sm shadow-md shadow-amber-600/20 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
           >
             <Sparkles className="w-4 h-4" />
             <span>
@@ -623,7 +625,7 @@ export default function BriefView({
             type="button"
             disabled={isPlanning}
             onClick={() => handleSubmit(true)}
-            className="btn-tactile min-h-[42px] w-full py-2 px-3 rounded-xl border text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+            className="btn-tactile min-h-[44px] w-full py-2 px-3 rounded-2xl border text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
             style={{
               backgroundColor: 'var(--bg-elevated)',
               borderColor: 'var(--border-strong)',
@@ -631,7 +633,7 @@ export default function BriefView({
             }}
           >
             <FileEdit className="w-3.5 h-3.5 text-amber-600" />
-            <span>ตรวจและปรับแก้รายละเอียดทุกช็อตก่อนสร้าง</span>
+            <span>ตรวจและปรับแก้แผนทุกช็อตก่อนสร้าง</span>
           </button>
         </div>
       </div>

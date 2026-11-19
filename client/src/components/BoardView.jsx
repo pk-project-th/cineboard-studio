@@ -879,18 +879,20 @@ export default function BoardView({
   const gridClass = pocketMode
     ? 'grid-cols-1 max-w-2xl mx-auto'
     : columns === 2
-    ? 'grid-cols-1 xl:grid-cols-2'
-    : 'grid-cols-1 md:grid-cols-2 2xl:grid-cols-3';
+    ? 'grid-cols-1 xl:grid-cols-2 items-stretch'
+    : 'grid-cols-1 md:grid-cols-2 2xl:grid-cols-3 items-stretch';
+
+  const progressPercent =
+    prompts.length > 0 ? Math.round((completedCount / prompts.length) * 100) : 0;
 
   return (
-    <div className="p-4 sm:p-6 lg:p-8 space-y-6 max-w-[1440px] mx-auto">
-      {/* Project Editorial Summary Header */}
+    <div className="p-4 sm:p-6 lg:p-8 pb-28 lg:pb-10 space-y-6 max-w-[1360px] mx-auto">
+      {/* Symmetrical Project Editorial Summary Header */}
       {prompts.length > 0 && (
-        <div
-          className="editorial-card rounded-2xl p-4 sm:p-5 space-y-4 no-print"
-        >
-          <div className="flex flex-wrap items-start justify-between gap-4">
-            <div className="space-y-1.5 max-w-2xl">
+        <div className="editorial-card rounded-2xl p-4 sm:p-5 space-y-4 no-print">
+          {/* Row 1: Title & Strategy */}
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+            <div className="space-y-1.5 min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
                 <span
                   className={`px-2.5 py-0.5 rounded-lg text-[11px] font-extrabold ${
@@ -899,24 +901,19 @@ export default function BoardView({
                       : 'bg-zinc-900 text-amber-400'
                   }`}
                 >
-                  {isPhotoProject ? '📸 โหมดภาพนิ่งระดับช่างภาพโลก' : '🎬 โหมดวิดีโอไวรัลไลฟ์สไตล์'}
+                  {isPhotoProject ? '📸 ภาพนิ่งระดับช่างภาพโลก' : '🎬 วิดีโอไวรัลไลฟ์สไตล์'}
                 </span>
-                <span className="px-2.5 py-0.5 rounded-lg bg-emerald-500/12 text-emerald-700 dark:text-emerald-300 text-xs font-bold">
-                  ✅ ถ่ายแล้ว {completedCount}/{prompts.length} {isPhotoProject ? 'ภาพ' : 'ฉาก'}
+                <span className="text-[11px] font-semibold" style={{ color: 'var(--text-muted)' }}>
+                  {prompts[0]?.aspect_ratio || (isPhotoProject ? '4:5' : '9:16')}
                 </span>
-                {!isPhotoProject && totalDuration > 0 && (
-                  <span className="px-2.5 py-0.5 rounded-lg bg-amber-500/12 text-amber-700 dark:text-amber-300 text-xs font-mono font-bold">
-                    ⏱️ รวม {Math.round(totalDuration)} วินาที
-                  </span>
-                )}
               </div>
 
-              <h1 className="text-lg sm:text-xl font-extrabold tracking-tight">
+              <h1 className="text-lg sm:text-xl font-extrabold tracking-tight leading-snug">
                 {currentSeries ? currentSeries.title : 'แผนสตอรี่บอร์ดพร้อมถ่าย'}
               </h1>
 
               {(currentSeries?.viral_hook || currentSeries?.music_vibe) && (
-                <div className="space-y-1 pt-0.5 text-xs" style={{ color: 'var(--text-secondary)' }}>
+                <div className="space-y-0.5 text-xs" style={{ color: 'var(--text-secondary)' }}>
                   {currentSeries?.viral_hook && <p>{currentSeries.viral_hook}</p>}
                   {currentSeries?.music_vibe && (
                     <p className="font-semibold text-amber-700 dark:text-amber-300">
@@ -927,50 +924,98 @@ export default function BoardView({
               )}
             </div>
 
-            {/* Right Controls */}
-            <div className="flex flex-wrap items-center gap-2">
+            {/* Symmetrical 3-Column Metric Strip */}
+            <div className="grid grid-cols-3 gap-2 shrink-0 lg:min-w-[320px]">
               <div
-                className="flex items-center p-1 rounded-xl border"
-                style={{
-                  backgroundColor: 'var(--bg-subtle)',
-                  borderColor: 'var(--border-subtle)'
-                }}
+                className="p-2.5 rounded-xl border text-center"
+                style={{ backgroundColor: 'var(--bg-elevated)', borderColor: 'var(--border-subtle)' }}
               >
-                <button
-                  type="button"
-                  onClick={() => setPocketMode(false)}
-                  className={`btn-tactile px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 cursor-pointer ${
-                    !pocketMode
-                      ? darkMode
-                        ? 'bg-amber-500 text-zinc-950'
-                        : 'bg-zinc-900 text-white'
-                      : 'opacity-70 hover:opacity-100'
-                  }`}
-                >
-                  <LayoutGrid className="w-3.5 h-3.5" />
-                  <span>บอร์ดภาพ</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setPocketMode(true)}
-                  className={`btn-tactile px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 cursor-pointer ${
-                    pocketMode
-                      ? darkMode
-                        ? 'bg-amber-500 text-zinc-950'
-                        : 'bg-zinc-900 text-white'
-                      : 'opacity-70 hover:opacity-100'
-                  }`}
-                >
-                  <Smartphone className="w-3.5 h-3.5" />
-                  <span>โหมดถือถ่ายหน้างาน</span>
-                </button>
+                <div className="text-[10px] font-semibold" style={{ color: 'var(--text-muted)' }}>
+                  ทั้งหมด
+                </div>
+                <div className="text-sm font-extrabold mt-0.5">
+                  {prompts.length} {isPhotoProject ? 'ภาพ' : 'ฉาก'}
+                </div>
               </div>
 
+              <div
+                className="p-2.5 rounded-xl border text-center"
+                style={{ backgroundColor: 'var(--bg-elevated)', borderColor: 'var(--border-subtle)' }}
+              >
+                <div className="text-[10px] font-semibold" style={{ color: 'var(--text-muted)' }}>
+                  {isPhotoProject ? 'สัดส่วนภาพ' : 'ความยาวรวม'}
+                </div>
+                <div className="text-sm font-extrabold mt-0.5 text-amber-600">
+                  {isPhotoProject
+                    ? prompts[0]?.aspect_ratio || '4:5'
+                    : `${Math.round(totalDuration)} วิ`}
+                </div>
+              </div>
+
+              <div
+                className="p-2.5 rounded-xl border text-center"
+                style={{ backgroundColor: 'var(--bg-elevated)', borderColor: 'var(--border-subtle)' }}
+              >
+                <div className="text-[10px] font-semibold" style={{ color: 'var(--text-muted)' }}>
+                  ถ่ายเสร็จแล้ว
+                </div>
+                <div className="text-sm font-extrabold mt-0.5 text-emerald-600">
+                  {completedCount}/{prompts.length} ({progressPercent}%)
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Row 2: Balanced Symmetrical Action Toolbar (2-Col Grid on iPhone 17, Clean Flex Row on Desktop) */}
+          <div
+            className="pt-3 border-t flex flex-col sm:flex-row sm:items-center justify-between gap-2.5"
+            style={{ borderColor: 'var(--border-subtle)' }}
+          >
+            {/* Left: Symmetrical View Mode Toggle */}
+            <div
+              className="grid grid-cols-2 p-1 rounded-xl border w-full sm:w-auto"
+              style={{
+                backgroundColor: 'var(--bg-subtle)',
+                borderColor: 'var(--border-subtle)'
+              }}
+            >
+              <button
+                type="button"
+                onClick={() => setPocketMode(false)}
+                className={`btn-tactile min-h-[38px] px-3 py-1.5 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer ${
+                  !pocketMode
+                    ? darkMode
+                      ? 'bg-amber-500 text-zinc-950 shadow-xs'
+                      : 'bg-zinc-900 text-white shadow-xs'
+                    : 'opacity-70 hover:opacity-100'
+                }`}
+              >
+                <LayoutGrid className="w-3.5 h-3.5" />
+                <span>บอร์ดภาพ</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setPocketMode(true)}
+                className={`btn-tactile min-h-[38px] px-3 py-1.5 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer ${
+                  pocketMode
+                    ? darkMode
+                      ? 'bg-amber-500 text-zinc-950 shadow-xs'
+                      : 'bg-zinc-900 text-white shadow-xs'
+                    : 'opacity-70 hover:opacity-100'
+                }`}
+              >
+                <Smartphone className="w-3.5 h-3.5" />
+                <span>โหมดถือถ่าย</span>
+              </button>
+            </div>
+
+            {/* Right: Symmetrical 2-Col Action Grid on Mobile, Flex Row on Desktop */}
+            <div className="grid grid-cols-2 sm:flex sm:flex-wrap items-center gap-2">
               {!isPhotoProject && (
                 <button
                   type="button"
                   onClick={handlePlayAllVoiceover}
-                  className={`btn-tactile min-h-[38px] px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 cursor-pointer ${
+                  className={`btn-tactile min-h-[40px] px-3 py-1.5 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer ${
                     playingAllVo
                       ? 'bg-rose-600 text-white'
                       : 'bg-emerald-600 hover:bg-emerald-700 text-white'
@@ -984,7 +1029,7 @@ export default function BoardView({
                   ) : (
                     <>
                       <Volume2 className="w-3.5 h-3.5" />
-                      <span>ฟังบทพากย์ทั้งคลิป</span>
+                      <span>ฟังบทพากย์</span>
                     </>
                   )}
                 </button>
@@ -994,7 +1039,7 @@ export default function BoardView({
                 <button
                   type="button"
                   onClick={() => onBatchRenderAll(true)}
-                  className="btn-tactile min-h-[38px] px-3 py-1.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs flex items-center gap-1.5 cursor-pointer"
+                  className="btn-tactile min-h-[40px] px-3 py-1.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer"
                 >
                   <Sparkles className="w-3.5 h-3.5" />
                   <span>วาดภาพ AI ({missingRealImagesCount})</span>
@@ -1003,21 +1048,8 @@ export default function BoardView({
 
               <button
                 type="button"
-                onClick={onSwitchToBulkEditor}
-                className="btn-tactile min-h-[38px] px-3 py-1.5 rounded-xl border text-xs font-bold flex items-center gap-1.5 cursor-pointer"
-                style={{
-                  backgroundColor: 'var(--bg-elevated)',
-                  borderColor: 'var(--border-strong)'
-                }}
-              >
-                <FileEdit className="w-3.5 h-3.5 text-amber-600" />
-                <span>แก้ทุกช็อต</span>
-              </button>
-
-              <button
-                type="button"
                 onClick={onAddShot}
-                className="btn-tactile min-h-[38px] px-3 py-1.5 rounded-xl border text-xs font-bold text-emerald-700 dark:text-emerald-400 flex items-center gap-1.5 cursor-pointer"
+                className="btn-tactile min-h-[40px] px-3 py-1.5 rounded-xl border text-xs font-bold text-emerald-700 dark:text-emerald-400 flex items-center justify-center gap-1.5 cursor-pointer"
                 style={{
                   backgroundColor: 'var(--bg-elevated)',
                   borderColor: 'var(--border-strong)'
@@ -1025,6 +1057,19 @@ export default function BoardView({
               >
                 <Plus className="w-3.5 h-3.5" />
                 <span>เพิ่ม{isPhotoProject ? 'ภาพ' : 'ฉาก'}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={onSwitchToBulkEditor}
+                className="hidden sm:flex btn-tactile min-h-[40px] px-3 py-1.5 rounded-xl border text-xs font-bold items-center justify-center gap-1.5 cursor-pointer"
+                style={{
+                  backgroundColor: 'var(--bg-elevated)',
+                  borderColor: 'var(--border-strong)'
+                }}
+              >
+                <FileEdit className="w-3.5 h-3.5 text-amber-600" />
+                <span>แก้ทุกช็อต</span>
               </button>
 
               {!pocketMode && (
@@ -1054,51 +1099,59 @@ export default function BoardView({
             </div>
           </div>
 
-          {/* Progress Bar */}
-          <div className="space-y-1.5">
-            <div className="w-full h-1.5 rounded-full overflow-hidden" style={{ backgroundColor: 'var(--bg-subtle)' }}>
-              <div
-                className="h-full bg-emerald-500 transition-all duration-300"
-                style={{ width: `${prompts.length > 0 ? Math.round((completedCount / prompts.length) * 100) : 0}%` }}
-              />
-            </div>
+          {/* Clean Full-Width Progress Bar */}
+          <div className="w-full h-1.5 rounded-full overflow-hidden" style={{ backgroundColor: 'var(--bg-subtle)' }}>
+            <div
+              className="h-full bg-emerald-500 transition-all duration-300"
+              style={{ width: `${progressPercent}%` }}
+            />
           </div>
         </div>
       )}
 
       {/* Cards Grid or Editorial Empty State */}
       {prompts.length === 0 ? (
-        <div className="editorial-card rounded-3xl p-8 sm:p-12 text-center max-w-2xl mx-auto my-8 space-y-5">
+        <div className="editorial-card rounded-3xl p-8 sm:p-12 text-center max-w-xl mx-auto my-6 space-y-5">
           <div className="w-16 h-16 rounded-2xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-600 mx-auto">
             <Camera className="w-8 h-8" />
           </div>
 
           <div className="space-y-2">
             <h2 className="text-xl font-extrabold tracking-tight">
-              เริ่มต้นสร้างสตอรี่บอร์ดไลฟ์สไตล์ระดับมืออาชีพ
+              เริ่มต้นสร้างสตอรี่บอร์ดไลฟ์สไตล์
             </h2>
-            <p className="text-sm leading-relaxed max-w-lg mx-auto" style={{ color: 'var(--text-secondary)' }}>
-              เลือกโหมดที่ต้องการจากแผงด้านซ้าย:
-              <br />
-              <strong className="text-amber-700 dark:text-amber-400">📸 โหมดภาพนิ่ง</strong> — แนะนำมุมกล้องสร้างมิติและแสงเงาแบบช่างภาพระดับโลก
-              <br />
-              <strong className="text-emerald-700 dark:text-emerald-400">🎬 โหมดวิดีโอไวรัล</strong> — วางแผนครบกี่ฉาก กี่วิ ถ่ายอะไร ข้อความบนจอ และบทพากย์
+            <p className="text-sm leading-relaxed max-w-md mx-auto" style={{ color: 'var(--text-secondary)' }}>
+              เลือกโหมดที่ต้องการได้เลยครับ:
             </p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-2 text-left max-w-md mx-auto">
+              <div className="p-3 rounded-xl border" style={{ backgroundColor: 'var(--bg-elevated)', borderColor: 'var(--border-subtle)' }}>
+                <div className="text-xs font-extrabold text-amber-700 dark:text-amber-400">📸 โหมดภาพนิ่ง</div>
+                <p className="text-[11px] mt-1 leading-relaxed" style={{ color: 'var(--text-muted)' }}>
+                  แนะนำมุมกล้องสร้างมิติและแสงเงาแบบช่างภาพระดับโลก
+                </p>
+              </div>
+              <div className="p-3 rounded-xl border" style={{ backgroundColor: 'var(--bg-elevated)', borderColor: 'var(--border-subtle)' }}>
+                <div className="text-xs font-extrabold text-emerald-700 dark:text-emerald-400">🎬 โหมดวิดีโอไวรัล</div>
+                <p className="text-[11px] mt-1 leading-relaxed" style={{ color: 'var(--text-muted)' }}>
+                  วางแผนครบกี่ฉาก กี่วิ ถ่ายอะไร ข้อความบนจอ และบทพากย์
+                </p>
+              </div>
+            </div>
           </div>
 
-          <div className="pt-2 lg:hidden">
+          <div className="pt-1 lg:hidden">
             <button
               type="button"
               onClick={onOpenSidebar}
-              className="btn-tactile px-6 py-3 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-extrabold text-sm shadow-md inline-flex items-center gap-2 cursor-pointer"
+              className="btn-tactile min-h-[48px] w-full sm:w-auto px-6 py-3 rounded-2xl bg-amber-600 hover:bg-amber-700 text-white font-extrabold text-sm shadow-md inline-flex items-center justify-center gap-2 cursor-pointer"
             >
               <SlidersHorizontal className="w-4 h-4" />
-              <span>เปิดแผงโยนโจทย์สร้างสตอรี่บอร์ด</span>
+              <span>เริ่มสร้างโจทย์ใหม่</span>
             </button>
           </div>
         </div>
       ) : (
-        <div className={`grid ${gridClass} gap-6`}>
+        <div className={`grid ${gridClass} gap-5 sm:gap-6`}>
           {prompts.map((shot, idx) => (
             <ShotCard
               key={shot.id}

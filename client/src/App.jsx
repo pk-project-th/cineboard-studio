@@ -4,6 +4,7 @@ import BriefView from './components/BriefView';
 import BoardView from './components/BoardView';
 import ShotListView from './components/ShotListView';
 import SettingsModal from './components/SettingsModal';
+import MobileBottomNav from './components/MobileBottomNav';
 import { RefreshCw, CheckCircle2, AlertCircle, Info, X } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
@@ -69,6 +70,8 @@ export default function App() {
 
   // Views: 'board' | 'bulk_editor' | 'shotlist'
   const [activeView, setActiveView] = useState('board');
+  // Dedicated iPhone / Mobile native tab: 'create' | 'board' | 'bulk_editor' | 'shotlist'
+  const [mobileTab, setMobileTab] = useState('create');
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [settingsModalOpen, setSettingsModalOpen] = useState(false);
 
@@ -95,13 +98,17 @@ export default function App() {
   const [copiedAll, setCopiedAll] = useState(false);
   const abortBatchRef = useRef(false);
 
-  // Sync theme class on document root
+  // Sync theme class on document root + iPhone 17 Dynamic Island theme-color meta tag
   useEffect(() => {
     const root = document.documentElement;
     if (darkMode) {
       root.classList.add('dark-theme');
     } else {
       root.classList.remove('dark-theme');
+    }
+    const metaTheme = document.querySelector('meta[name="theme-color"]');
+    if (metaTheme) {
+      metaTheme.setAttribute('content', darkMode ? '#0C0E13' : '#F7F5F0');
     }
     try {
       localStorage.setItem('cineboard_theme', darkMode ? 'dark' : 'light');
@@ -194,8 +201,10 @@ export default function App() {
         const targetObj = series.find((s) => s.id === target);
         if (targetObj?.mode) setActiveMode(targetObj.mode);
         await fetchPrompts(target);
+        setMobileTab('board');
       } else {
         setSelectedSeriesId('all');
+        setMobileTab('create');
         setLoading(false);
       }
     };
@@ -346,6 +355,7 @@ export default function App() {
         setSelectedSeriesId(newSeriesId);
         setPrompts(commitJson.data);
         setActiveView('board');
+        setMobileTab('board');
 
         mirrorToLocalStore(nextSeriesList, newSeriesId, commitJson.data);
         try {
@@ -353,8 +363,8 @@ export default function App() {
           localStorage.removeItem('cineboard_draft_concept');
         } catch (_) {}
 
-        if (typeof window !== 'undefined' && window.innerWidth < 1024) {
-          setSidebarOpen(false);
+        if (typeof window !== 'undefined') {
+          window.scrollTo({ top: 0, behavior: 'smooth' });
         }
 
         showToast(
@@ -405,8 +415,9 @@ export default function App() {
         shots: planJson.data.shots
       });
       setActiveView('bulk_editor');
-      if (typeof window !== 'undefined' && window.innerWidth < 1024) {
-        setSidebarOpen(false);
+      setMobileTab('bulk_editor');
+      if (typeof window !== 'undefined') {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
       }
     } catch (_) {
       showToast('เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์ครับ', 'error');
@@ -688,6 +699,19 @@ export default function App() {
 
   const currentSeries = seriesList.find((s) => s.id === selectedSeriesId);
 
+  const handleMobileTabSelect = (tabId) => {
+    setMobileTab(tabId);
+    if (tabId === 'create') {
+      setSidebarOpen(true);
+    } else {
+      if (tabId !== 'bulk_editor') setPreCommitDraft(null);
+      setActiveView(tabId);
+    }
+    if (typeof window !== 'undefined') {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  };
+
   return (
     <div
       className="min-h-[100dvh] flex flex-col transition-colors"
@@ -699,6 +723,7 @@ export default function App() {
         onChangeView={(v) => {
           if (v !== 'bulk_editor') setPreCommitDraft(null);
           setActiveView(v);
+          setMobileTab(v);
         }}
         sidebarOpen={sidebarOpen}
         onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
@@ -706,8 +731,14 @@ export default function App() {
         onToggleDarkMode={() => setDarkMode(!darkMode)}
         seriesList={seriesList}
         selectedSeriesId={selectedSeriesId}
-        onSelectSeries={handleSelectSeries}
-        onNewProject={() => setSidebarOpen(true)}
+        onSelectSeries={(id) => {
+          handleSelectSeries(id);
+          setMobileTab('board');
+        }}
+        onNewProject={() => {
+          setSidebarOpen(true);
+          setMobileTab('create');
+        }}
         onDeleteSeries={handleDeleteSeries}
         onClearAllData={handleClearAllData}
         onBatchRenderAll={(onlyMissing) => runBatchImageRender(prompts, onlyMissing)}
@@ -719,9 +750,10 @@ export default function App() {
         totalShots={prompts.length}
       />
 
-      {/* Main Workspace */}
+      {/* Main Workspace: Symmetrical 2-Pane Studio on Desktop (lg+) | Native App Tabs on iPhone 17 (< lg) */}
       <div className="flex-1 flex flex-col lg:flex-row min-h-[calc(100dvh-3.5rem)]">
-        {sidebarOpen && (
+        {/* Desktop Collapsible Left Dock + Mobile Full-Screen 'create' Tab */}
+        <div className={`${mobileTab === 'create' ? 'block' : 'hidden'} ${sidebarOpen ? 'lg:block' : 'lg:hidden'}`}>
           <BriefView
             mode={activeMode}
             onChangeMode={handleChangeMode}
@@ -730,9 +762,10 @@ export default function App() {
             onPlanForReview={handlePlanForReview}
             isPlanning={isPlanning}
           />
-        )}
+        </div>
 
-        <main className="flex-1 min-w-0 overflow-y-auto safe-bottom">
+        {/* Right Canvas on Desktop | Full-Screen Active Content Tab on iPhone 17 */}
+        <main className={`${mobileTab === 'create' ? 'hidden lg:block' : 'block'} flex-1 min-w-0 overflow-y-auto`}>
           {loading ? (
             <div className="py-28 flex flex-col items-center justify-center gap-3" style={{ color: 'var(--text-muted)' }}>
               <RefreshCw className="w-6 h-6 animate-spin text-amber-600" />
@@ -751,8 +784,14 @@ export default function App() {
               onDeleteShot={handleDeleteShot}
               onAddShot={handleAddShot}
               onUploadShotImage={handleUploadShotImage}
-              onSwitchToBulkEditor={() => setActiveView('bulk_editor')}
-              onOpenSidebar={() => setSidebarOpen(true)}
+              onSwitchToBulkEditor={() => {
+                setActiveView('bulk_editor');
+                setMobileTab('bulk_editor');
+              }}
+              onOpenSidebar={() => {
+                setSidebarOpen(true);
+                setMobileTab('create');
+              }}
               onNotify={showToast}
             />
           ) : (
@@ -764,17 +803,35 @@ export default function App() {
               onCancelDraft={() => {
                 setPreCommitDraft(null);
                 setActiveView('board');
+                setMobileTab('board');
               }}
-              onCommitDraftAndRender={handleCommitDraftAndRender}
+              onCommitDraftAndRender={async (draftPayload, renderAll) => {
+                await handleCommitDraftAndRender(draftPayload, renderAll);
+                setMobileTab('board');
+              }}
               onSaveBulkEdits={handleSaveBulkEdits}
-              onSaveBulkAndRenderAll={handleSaveBulkAndRenderAll}
+              onSaveBulkAndRenderAll={async (edited) => {
+                await handleSaveBulkAndRenderAll(edited);
+                setMobileTab('board');
+              }}
               onRenderSingleShot={handleRenderShotImage}
               renderingIds={renderingIds}
-              onBackToBoard={() => setActiveView('board')}
+              onBackToBoard={() => {
+                setActiveView('board');
+                setMobileTab('board');
+              }}
             />
           )}
         </main>
       </div>
+
+      {/* Native-Style Frosted Bottom Tab Bar for iPhone 17 & Mobile */}
+      <MobileBottomNav
+        activeTab={mobileTab}
+        onSelectTab={handleMobileTabSelect}
+        totalShots={prompts.length}
+        darkMode={darkMode}
+      />
 
       {/* Settings Modal */}
       <SettingsModal
@@ -823,9 +880,9 @@ export default function App() {
         </div>
       )}
 
-      {/* Level 5 Floating Toast Notification */}
+      {/* Level 5 Floating Toast Notification (Elevated cleanly above iPhone 17 Bottom Tab Bar!) */}
       {toast && (
-        <div className="fixed bottom-5 right-4 left-4 sm:left-auto z-[60] flex justify-center sm:justify-end pointer-events-none">
+        <div className="fixed bottom-24 lg:bottom-5 right-4 left-4 sm:left-auto z-[60] flex justify-center sm:justify-end pointer-events-none">
           <div
             className={`pointer-events-auto px-4 py-3 rounded-2xl shadow-2xl border text-xs font-bold flex items-center gap-2.5 max-w-md ${
               toast.type === 'success'
