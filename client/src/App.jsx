@@ -96,7 +96,12 @@ export default function App() {
     total: 0
   });
   const [copiedAll, setCopiedAll] = useState(false);
+  const [isCloudSyncing, setIsCloudSyncing] = useState(false);
   const abortBatchRef = useRef(false);
+  const selectedSeriesIdRef = useRef(selectedSeriesId);
+  useEffect(() => {
+    selectedSeriesIdRef.current = selectedSeriesId;
+  }, [selectedSeriesId]);
 
   // Sync theme class on document root + iPhone 17 Dynamic Island theme-color meta tag
   useEffect(() => {
@@ -187,11 +192,86 @@ export default function App() {
     return [];
   };
 
-  // Initial Load
+  // Bidirectional Cloud Auto-Sync (merges local device projects <-> server SQLite <-> Cloud Vault)
+  const syncWithCloud = async (isManual = false) => {
+    setIsCloudSyncing(true);
+    try {
+      const local = readLocalStore();
+      const pullUrl = isManual ? '/api/sync/state?pull=1' : '/api/sync/state';
+      const res = await fetch(pullUrl);
+      const json = await res.json();
+
+      if (json.success && json.data) {
+        const remoteSeries = Array.isArray(json.data.series) ? json.data.series : [];
+        const remoteShots = json.data.shotsBySeries || {};
+
+        const remoteIds = new Set(remoteSeries.map((s) => s.id));
+        const localOnlySeries = local.series.filter((s) => s && s.id && !remoteIds.has(s.id));
+
+        // If this device has projects in localStorage that the server/cloud doesn't have yet, push them up!
+        if (localOnlySeries.length > 0) {
+          const pushRes = await fetch('/api/sync/push', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              series: local.series,
+              shotsBySeries: local.shotsBySeries
+            })
+          });
+          const pushJson = await pushRes.json();
+          if (pushJson.success && pushJson.data) {
+            const unifiedSeries = pushJson.data.series || [];
+            const unifiedShots = pushJson.data.shotsBySeries || {};
+            writeLocalStore(unifiedSeries, unifiedShots);
+            setSeriesList(unifiedSeries);
+            const activeId = selectedSeriesIdRef.current;
+            if (activeId && unifiedShots[activeId]) {
+              setPrompts(unifiedShots[activeId]);
+            }
+            if (isManual) showToast('☁️ ซิงก์ข้อมูลข้ามอุปกรณ์เรียบร้อยแล้วครับ!', 'success');
+            return unifiedSeries;
+          }
+        }
+
+        // Otherwise update local store with remote cloud state
+        if (remoteSeries.length > 0) {
+          writeLocalStore(remoteSeries, remoteShots);
+          setSeriesList(remoteSeries);
+          const curId = selectedSeriesIdRef.current;
+          const targetId =
+            curId && curId !== 'all' && remoteSeries.some((s) => s.id === curId)
+              ? curId
+              : remoteSeries[0].id;
+          setSelectedSeriesId(targetId);
+          if (remoteShots[targetId]) {
+            setPrompts(remoteShots[targetId]);
+          }
+        }
+
+        if (isManual) {
+          showToast('☁️ ซิงก์ข้อมูลล่าสุดข้ามอุปกรณ์เรียบร้อยแล้วครับ!', 'success');
+        }
+        return remoteSeries;
+      }
+    } catch (err) {
+      console.warn('Cloud auto-sync notice:', err.message);
+      if (isManual) {
+        showToast('ซิงก์ข้อมูลในเครื่องเรียบร้อย (รอการเชื่อมต่อเซิร์ฟเวอร์)', 'info');
+      }
+    } finally {
+      setIsCloudSyncing(false);
+    }
+    return null;
+  };
+
+  // Initial Load + Automatic Cross-Device Sync on Focus & Background Timer
   useEffect(() => {
     const init = async () => {
-      const series = await fetchSeries();
+      setLoading(true);
+      const syncedSeries = await syncWithCloud(false);
+      const series = syncedSeries && syncedSeries.length > 0 ? syncedSeries : await fetchSeries();
       const savedSeriesId = localStorage.getItem('cineboard_active_series');
+
       if (series.length > 0) {
         const target =
           savedSeriesId && series.some((s) => s.id === savedSeriesId)
@@ -209,6 +289,28 @@ export default function App() {
       }
     };
     init();
+
+    // Auto-sync whenever user unlocks phone or switches back to this browser tab!
+    const handleFocusSync = () => {
+      if (document.visibilityState === 'visible') {
+        syncWithCloud(false);
+      }
+    };
+    window.addEventListener('focus', handleFocusSync);
+    document.addEventListener('visibilitychange', handleFocusSync);
+
+    // Periodic background check every 30s
+    const interval = setInterval(() => {
+      if (document.visibilityState === 'visible') {
+        syncWithCloud(false);
+      }
+    }, 30000);
+
+    return () => {
+      window.removeEventListener('focus', handleFocusSync);
+      document.removeEventListener('visibilitychange', handleFocusSync);
+      clearInterval(interval);
+    };
   }, []);
 
   const handleChangeMode = (nextMode) => {
@@ -750,6 +852,16 @@ export default function App() {
       writeLocalStore(mergedSeries, mergedShotsBySeries);
       setSeriesList(mergedSeries);
 
+      // Push imported projects to Cloud Vault so other devices get them automatically too!
+      fetch('/api/sync/push', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          series: mergedSeries,
+          shotsBySeries: mergedShotsBySeries
+        })
+      }).catch(() => {});
+
       if (parsed.series.length > 0) {
         const newestImported = parsed.series[0];
         setSelectedSeriesId(newestImported.id);
@@ -855,6 +967,8 @@ export default function App() {
         onClearAllData={handleClearAllData}
         onExportBackup={handleExportBackup}
         onImportBackup={handleImportBackup}
+        isCloudSyncing={isCloudSyncing}
+        onCloudSync={() => syncWithCloud(true)}
         onBatchRenderAll={(onlyMissing) => runBatchImageRender(prompts, onlyMissing)}
         onStopBatchRender={handleStopBatchRender}
         batchRenderProgress={batchRenderProgress}

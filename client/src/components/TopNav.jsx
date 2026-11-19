@@ -20,7 +20,8 @@ import {
   Moon,
   Square,
   Download,
-  Upload
+  Upload,
+  Cloud
 } from 'lucide-react';
 
 export default function TopNav({
@@ -38,6 +39,8 @@ export default function TopNav({
   onClearAllData,
   onExportBackup,
   onImportBackup,
+  isCloudSyncing = false,
+  onCloudSync,
   onBatchRenderAll,
   onStopBatchRender,
   batchRenderProgress,
@@ -344,6 +347,29 @@ export default function TopNav({
 
         {/* RIGHT SLOT (Symmetrically aligned right) */}
         <div className="flex items-center gap-1.5 shrink-0 lg:justify-self-end">
+          {/* Cloud Auto-Sync Live Badge & 1-Tap Force Sync */}
+          <button
+            type="button"
+            onClick={() => onCloudSync && onCloudSync()}
+            title="ระบบซิงก์ข้อมูลอัตโนมัติข้ามเครื่อง (กดเพื่อซิงก์ทันที)"
+            className="btn-tactile h-9 px-2.5 rounded-xl border text-[11px] font-bold flex items-center gap-1.5 cursor-pointer"
+            style={{
+              backgroundColor: 'var(--bg-subtle)',
+              borderColor: 'var(--border-subtle)',
+              color: 'var(--text-primary)'
+            }}
+          >
+            {isCloudSyncing ? (
+              <RefreshCw className="w-3.5 h-3.5 text-amber-600 animate-spin" />
+            ) : (
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+              </span>
+            )}
+            <Cloud className="w-3.5 h-3.5 text-emerald-600" />
+            <span className="hidden sm:inline">{isCloudSyncing ? 'กำลังซิงก์...' : 'ซิงก์อัตโนมัติ'}</span>
+          </button>
           {totalShots > 0 && (
             isRenderingBatch ? (
               <div className="flex items-center gap-1">

@@ -6,6 +6,7 @@ const db = require('./db');
 const config = require('./config');
 const { getStoryboardSketch } = require('./sketchHelper');
 const aiService = require('./aiService');
+const cloudSync = require('./cloudSync');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -37,9 +38,11 @@ app.get('/api/health', (req, res) => {
 // 1. SERIES / PROJECT ENDPOINTS
 // ==========================================
 
-app.get('/api/series', (req, res) => {
+let initialCloudPullDone = false;
+
+app.get('/api/series', async (req, res) => {
   try {
-    const series = db.prepare(`
+    let series = db.prepare(`
       SELECT s.*, 
         (SELECT COUNT(*) FROM prompts p WHERE p.series_id = s.id AND p.is_active = 1) AS shot_count,
         (SELECT p.image_url FROM prompts p WHERE p.series_id = s.id AND p.is_active = 1 ORDER BY p.step_number ASC, p.sort_order ASC LIMIT 1) AS preview_image,
@@ -47,7 +50,26 @@ app.get('/api/series', (req, res) => {
       FROM series s 
       ORDER BY s.created_at DESC
     `).all();
-    res.json({ success: true, data: series });
+
+    // If Render just rebooted with an empty DB, automatically hydrate from Cloud Vault!
+    if (series.length === 0 && !initialCloudPullDone) {
+      initialCloudPullDone = true;
+      await cloudSync.pullFromCloudIntoDb(db, req.query.sync_code);
+      series = db.prepare(`
+        SELECT s.*, 
+          (SELECT COUNT(*) FROM prompts p WHERE p.series_id = s.id AND p.is_active = 1) AS shot_count,
+          (SELECT p.image_url FROM prompts p WHERE p.series_id = s.id AND p.is_active = 1 ORDER BY p.step_number ASC, p.sort_order ASC LIMIT 1) AS preview_image,
+          (SELECT SUM(p.duration_seconds) FROM prompts p WHERE p.series_id = s.id AND p.is_active = 1) AS total_duration
+        FROM series s 
+        ORDER BY s.created_at DESC
+      `).all();
+    }
+
+    res.json({
+      success: true,
+      data: series,
+      synced_at: cloudSync.getLastSyncTime()
+    });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
@@ -84,6 +106,7 @@ app.delete('/api/series/:id', (req, res) => {
     if (result.changes === 0) {
       return res.status(404).json({ success: false, error: 'ไม่พบโปรเจกต์ที่ต้องการลบ' });
     }
+    cloudSync.scheduleCloudPush(db);
     res.json({ success: true, message: 'ลบโปรเจกต์สตอรี่บอร์ดและช็อตทั้งหมดเรียบร้อย' });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
@@ -242,6 +265,7 @@ app.put('/api/prompts/:id', (req, res) => {
     );
 
     const updated = db.prepare('SELECT * FROM prompts WHERE id = ?').get(id);
+    cloudSync.scheduleCloudPush(db);
     res.json({ success: true, data: updated });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
@@ -309,6 +333,7 @@ app.put('/api/prompts-batch', (req, res) => {
       }
     }
 
+    cloudSync.scheduleCloudPush(db);
     res.json({ success: true, message: `อัปเดต ${updates.length} ช็อตเรียบร้อย` });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
@@ -320,6 +345,7 @@ app.delete('/api/prompts/:id', (req, res) => {
   try {
     const { id } = req.params;
     db.prepare('DELETE FROM prompts WHERE id = ?').run(id);
+    cloudSync.scheduleCloudPush(db);
     res.json({ success: true, message: 'ลบช็อตเรียบร้อย' });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
@@ -532,6 +558,7 @@ app.post('/api/storyboard/commit-shots', async (req, res) => {
     }
 
     const createdSeries = db.prepare('SELECT * FROM series WHERE id = ?').get(seriesId);
+    cloudSync.scheduleCloudPush(db);
 
     res.json({
       success: true,
@@ -629,6 +656,7 @@ app.post('/api/storyboard/append-shot', async (req, res) => {
     );
 
     const inserted = db.prepare('SELECT * FROM prompts WHERE id = ?').get(pId);
+    cloudSync.scheduleCloudPush(db);
     res.json({ success: true, data: inserted });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
@@ -705,7 +733,76 @@ app.post('/api/admin/clear', (req, res) => {
   try {
     db.prepare('DELETE FROM prompts').run();
     db.prepare('DELETE FROM series').run();
+    cloudSync.scheduleCloudPush(db);
     res.json({ success: true, message: 'ล้างกระดานสตอรี่บอร์ดทั้งหมดเรียบร้อย' });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ==========================================
+// 4B. AUTOMATIC CLOUD SYNC ENDPOINTS (iPhone 17 <-> Home PC)
+// ==========================================
+
+app.get('/api/sync/state', async (req, res) => {
+  try {
+    const syncCode = req.query.sync_code || '';
+    const forceCloudPull = req.query.pull === '1';
+    const currentCount = db.prepare('SELECT COUNT(*) as c FROM series').get().c;
+
+    if (forceCloudPull || currentCount === 0) {
+      await cloudSync.pullFromCloudIntoDb(db, syncCode);
+    }
+
+    const snapshot = cloudSync.exportDbSnapshot(db);
+    // Attach full image_url (including SVGs) for client display
+    const allPrompts = db
+      .prepare('SELECT * FROM prompts WHERE is_active = 1 ORDER BY step_number ASC, sort_order ASC')
+      .all();
+    const fullShotsBySeries = {};
+    for (const p of allPrompts) {
+      if (!fullShotsBySeries[p.series_id]) fullShotsBySeries[p.series_id] = [];
+      fullShotsBySeries[p.series_id].push(p);
+    }
+
+    res.json({
+      success: true,
+      synced_at: cloudSync.getLastSyncTime() || new Date().toISOString(),
+      data: {
+        series: snapshot.series,
+        shotsBySeries: fullShotsBySeries
+      }
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.post('/api/sync/push', async (req, res) => {
+  try {
+    const { series, shotsBySeries, sync_code = '' } = req.body;
+    if (Array.isArray(series) && series.length > 0) {
+      cloudSync.importSnapshotIntoDb(db, { series, shotsBySeries });
+    }
+    const pushRes = await cloudSync.pushDbToCloudNow(db, sync_code);
+    const snapshot = cloudSync.exportDbSnapshot(db);
+    const allPrompts = db
+      .prepare('SELECT * FROM prompts WHERE is_active = 1 ORDER BY step_number ASC, sort_order ASC')
+      .all();
+    const fullShotsBySeries = {};
+    for (const p of allPrompts) {
+      if (!fullShotsBySeries[p.series_id]) fullShotsBySeries[p.series_id] = [];
+      fullShotsBySeries[p.series_id].push(p);
+    }
+
+    res.json({
+      success: true,
+      synced_at: pushRes.synced_at || new Date().toISOString(),
+      data: {
+        series: snapshot.series,
+        shotsBySeries: fullShotsBySeries
+      }
+    });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
@@ -725,6 +822,16 @@ if (fs.existsSync(clientDistPath)) {
   });
 }
 
-app.listen(PORT, () => {
+app.listen(PORT, async () => {
   console.log(`🚀 CineBoard Studio Server running on http://localhost:${PORT}`);
+  // Automatically hydrate SQLite from Cloud Vault on startup!
+  try {
+    const count = db.prepare('SELECT COUNT(*) as c FROM series').get().c;
+    if (count === 0) {
+      initialCloudPullDone = true;
+      await cloudSync.pullFromCloudIntoDb(db);
+    }
+  } catch (e) {
+    console.warn('[Startup Cloud Hydrate Notice]:', e.message);
+  }
 });
