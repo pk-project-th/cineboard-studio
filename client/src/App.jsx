@@ -656,6 +656,118 @@ export default function App() {
     });
   };
 
+  // Export All Projects Backup (.json) for Cross-Device Transfer (iPhone 17 <-> Home PC)
+  const handleExportBackup = async () => {
+    try {
+      const store = readLocalStore();
+      const allSeries = seriesList.length > 0 ? seriesList : store.series;
+      if (allSeries.length === 0) {
+        showToast('ยังไม่มีโปรเจกต์ให้สำรองข้อมูลครับ', 'info');
+        return;
+      }
+
+      const shotsBySeries = { ...store.shotsBySeries };
+      if (selectedSeriesId && selectedSeriesId !== 'all' && prompts.length > 0) {
+        shotsBySeries[selectedSeriesId] = prompts;
+      }
+
+      // Ensure every series in list has its shots included
+      for (const s of allSeries) {
+        if (!shotsBySeries[s.id] || shotsBySeries[s.id].length === 0) {
+          try {
+            const res = await fetch(`/api/prompts?series_id=${s.id}`);
+            const data = await res.json();
+            if (data.success && Array.isArray(data.data)) {
+              shotsBySeries[s.id] = data.data;
+            }
+          } catch (_) {}
+        }
+      }
+
+      const backupPayload = {
+        app: 'CineBoard Studio',
+        version: '4.0',
+        exported_at: new Date().toISOString(),
+        series: allSeries,
+        shotsBySeries
+      };
+
+      const blob = new Blob([JSON.stringify(backupPayload, null, 2)], {
+        type: 'application/json'
+      });
+      const dateStr = new Date().toISOString().slice(0, 10);
+      const filename = `cineboard-backup-${dateStr}.json`;
+
+      // Use Web Share API on iPhone if file sharing is supported, otherwise clean download
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 1500);
+
+      showToast(`สำรองข้อมูล ${allSeries.length} โปรเจกต์เป็นไฟล์ ${filename} เรียบร้อย!`, 'success');
+    } catch (_) {
+      showToast('ไม่สามารถสร้างไฟล์สำรองข้อมูลได้ครับ', 'error');
+    }
+  };
+
+  // Import Projects Backup (.json) with Smart Merge (never overwrites existing other projects!)
+  const handleImportBackup = async (file) => {
+    if (!file) return;
+    try {
+      const text = await file.text();
+      const parsed = JSON.parse(text);
+      if (!parsed || !Array.isArray(parsed.series) || typeof parsed.shotsBySeries !== 'object') {
+        showToast('ไฟล์สำรองข้อมูลไม่ถูกต้อง กรุณาเลือกไฟล์ .json ที่ส่งออกจาก CineBoard ครับ', 'error');
+        return;
+      }
+
+      const currentStore = readLocalStore();
+      const existingSeriesMap = new Map();
+      (seriesList.length > 0 ? seriesList : currentStore.series).forEach((s) =>
+        existingSeriesMap.set(s.id, s)
+      );
+
+      const mergedShotsBySeries = { ...currentStore.shotsBySeries };
+      let importedCount = 0;
+
+      for (const s of parsed.series) {
+        if (!s || !s.id) continue;
+        existingSeriesMap.set(s.id, s);
+        if (Array.isArray(parsed.shotsBySeries[s.id])) {
+          mergedShotsBySeries[s.id] = parsed.shotsBySeries[s.id];
+        }
+        importedCount++;
+      }
+
+      const mergedSeries = Array.from(existingSeriesMap.values()).sort((a, b) =>
+        String(b.created_at || b.id).localeCompare(String(a.created_at || a.id))
+      );
+
+      writeLocalStore(mergedSeries, mergedShotsBySeries);
+      setSeriesList(mergedSeries);
+
+      if (parsed.series.length > 0) {
+        const newestImported = parsed.series[0];
+        setSelectedSeriesId(newestImported.id);
+        if (newestImported.mode) setActiveMode(newestImported.mode);
+        setPrompts(mergedShotsBySeries[newestImported.id] || []);
+        setActiveView('board');
+        setMobileTab('board');
+        try {
+          localStorage.setItem('cineboard_active_series', newestImported.id);
+        } catch (_) {}
+      }
+
+      showToast(`นำเข้าข้อมูลสำเร็จ ${importedCount} โปรเจกต์ พร้อมใช้งานทันทีครับ!`, 'success');
+    } catch (_) {
+      showToast('ไม่สามารถอ่านไฟล์สำรองได้ กรุณาตรวจสอบว่าเป็นไฟล์ .json ครับ', 'error');
+    }
+  };
+
   // Copy Complete Shooting Guide (Adapts automatically for Photo Mode vs Video Mode!)
   const handleCopyAllPrompts = () => {
     if (prompts.length === 0) return;
@@ -741,6 +853,8 @@ export default function App() {
         }}
         onDeleteSeries={handleDeleteSeries}
         onClearAllData={handleClearAllData}
+        onExportBackup={handleExportBackup}
+        onImportBackup={handleImportBackup}
         onBatchRenderAll={(onlyMissing) => runBatchImageRender(prompts, onlyMissing)}
         onStopBatchRender={handleStopBatchRender}
         batchRenderProgress={batchRenderProgress}
@@ -837,6 +951,9 @@ export default function App() {
       <SettingsModal
         isOpen={settingsModalOpen}
         onClose={() => setSettingsModalOpen(false)}
+        onExportBackup={handleExportBackup}
+        onImportBackup={handleImportBackup}
+        totalProjects={seriesList.length}
       />
 
       {/* In-App Confirm Dialog */}
