@@ -65,7 +65,7 @@ db.exec(`
   CREATE TABLE IF NOT EXISTS assets (
     id TEXT PRIMARY KEY,
     name TEXT NOT NULL,
-    type TEXT NOT NULL, -- 'character' | 'scene' | 'product'
+    type TEXT NOT NULL,
     description TEXT,
     prompt TEXT,
     image_url TEXT,
@@ -73,7 +73,7 @@ db.exec(`
   );
 `);
 
-// Safe migrations for prompts table
+// Safe migrations
 const promptMigrations = [
   `ALTER TABLE prompts ADD COLUMN reference_image TEXT;`,
   `ALTER TABLE prompts ADD COLUMN camera_angle TEXT;`,
@@ -94,8 +94,18 @@ const promptMigrations = [
   `ALTER TABLE prompts ADD COLUMN timecode TEXT;`,
   `ALTER TABLE prompts ADD COLUMN shot_role TEXT;`,
   `ALTER TABLE prompts ADD COLUMN is_completed INTEGER DEFAULT 0;`,
-  `ALTER TABLE series ADD COLUMN target_duration REAL DEFAULT 30.0;`,
-  `ALTER TABLE series ADD COLUMN pacing TEXT DEFAULT 'fast';`
+  `ALTER TABLE prompts ADD COLUMN mode TEXT DEFAULT 'video';`,
+  `ALTER TABLE prompts ADD COLUMN master_photographer TEXT;`,
+  `ALTER TABLE prompts ADD COLUMN depth_technique TEXT;`,
+  `ALTER TABLE prompts ADD COLUMN story_meaning TEXT;`,
+  `ALTER TABLE prompts ADD COLUMN pose_guide TEXT;`,
+  `ALTER TABLE prompts ADD COLUMN lighting_tip TEXT;`,
+  `ALTER TABLE prompts ADD COLUMN transition_tip TEXT;`,
+  `ALTER TABLE series ADD COLUMN target_duration REAL DEFAULT 20.0;`,
+  `ALTER TABLE series ADD COLUMN pacing TEXT DEFAULT 'fast';`,
+  `ALTER TABLE series ADD COLUMN mode TEXT DEFAULT 'video';`,
+  `ALTER TABLE series ADD COLUMN viral_hook TEXT;`,
+  `ALTER TABLE series ADD COLUMN music_vibe TEXT;`
 ];
 
 promptMigrations.forEach(stmt => {

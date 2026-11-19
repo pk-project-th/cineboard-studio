@@ -1,15 +1,12 @@
-// CineBoard Studio 3.0 — On-the-Go Content & Travel Storyboard AI Engine
-// Designed for real-world content creators & travelers:
-//   1. Connected Story Arcs (Hook -> Arrival -> Highlight -> Detail -> Emotion -> CTA)
-//   2. Complete Shooting Guide per Shot (กี่วิ • ถ่ายอะไร • มุมกล้องมือถือ • เว้นที่ใส่ข้อความ • บทพากย์)
-//   3. Accurate Thai-to-English Neural Translation + Multi-Tier Free AI Image Rendering (FLUX.1 / SubNP / Pollinations)
+// CineBoard Studio 4.0 — Dual-Mode Storyboard AI Engine (Master Photo Set + Viral Lifestyle Video)
+// Reliable, fast, zero-crash pipeline with Thai-to-English Neural Translation & Multi-Tier Free AI Image Rendering
 
 const config = require('./config');
 const { getStoryboardSketch } = require('./sketchHelper');
 const {
   parseMultiSceneScript,
-  enrichSingleBeat,
-  buildConnectedStoryBeats,
+  buildMasterPhotoStoryboard,
+  buildViralLifestyleVideoBeats,
   getShotNarrativeRole,
   extractCleanSubject
 } = require('./scriptParser');
@@ -27,19 +24,13 @@ function extractJsonObject(rawText) {
   if (!rawText) return null;
   if (typeof rawText === 'object') return rawText;
   const str = String(rawText).trim();
-  try {
-    return JSON.parse(str);
-  } catch (_) {}
+  try { return JSON.parse(str); } catch (_) {}
   const cleaned = str.replace(/```json/gi, '').replace(/```/g, '').trim();
-  try {
-    return JSON.parse(cleaned);
-  } catch (_) {}
+  try { return JSON.parse(cleaned); } catch (_) {}
   const firstBrace = cleaned.indexOf('{');
   const lastBrace = cleaned.lastIndexOf('}');
   if (firstBrace !== -1 && lastBrace > firstBrace) {
-    try {
-      return JSON.parse(cleaned.slice(firstBrace, lastBrace + 1));
-    } catch (_) {}
+    try { return JSON.parse(cleaned.slice(firstBrace, lastBrace + 1)); } catch (_) {}
   }
   return null;
 }
@@ -50,8 +41,7 @@ function extractJsonObject(rawText) {
 async function translateToEnglish(text) {
   if (!text || typeof text !== 'string') return '';
   let clean = text
-    .replace(/^[\s\-•*🎬🎥✨🚗🎧📱#\d.)]+/, '')
-    .replace(/เซลล์/g, 'พนักงานขายรถยนต์')
+    .replace(/^[\s\-•*🎬🎥📸✨🚗🎧📱#\d.)]+/, '')
     .trim();
   if (!clean) return '';
   if (!/[\u0E00-\u0E7F]/.test(clean)) return clean;
@@ -72,7 +62,7 @@ async function translateToEnglish(text) {
   } catch (e) {
     console.warn('[Translator Notice]:', e.message);
   }
-  return clean.replace(/[\u0E00-\u0E7F]+/g, ' ').replace(/\s+/g, ' ').trim() || 'cinematic travel lifestyle scene';
+  return clean.replace(/[\u0E00-\u0E7F]+/g, ' ').replace(/\s+/g, ' ').trim() || 'editorial lifestyle travel photography';
 }
 
 /**
@@ -134,9 +124,6 @@ async function callLLMChat(systemPrompt, userPrompt) {
   return null;
 }
 
-/**
- * Generate Real AI Image using HuggingFace Gradio Space (FLUX.1-schnell)
- */
 async function callGradioFluxSpace(spaceBaseUrl, prompt, width, height, seed) {
   const controller1 = new AbortController();
   const t1 = setTimeout(() => controller1.abort(), 12000);
@@ -151,15 +138,10 @@ async function callGradioFluxSpace(spaceBaseUrl, prompt, width, height, seed) {
   });
   clearTimeout(t1);
 
-  if (!callRes.ok) {
-    throw new Error(`Gradio call failed: ${callRes.status}`);
-  }
-
+  if (!callRes.ok) throw new Error(`Gradio call failed: ${callRes.status}`);
   const callData = await callRes.json();
   const eventId = callData.event_id;
-  if (!eventId) {
-    throw new Error('No event_id returned from Gradio space');
-  }
+  if (!eventId) throw new Error('No event_id returned from Gradio space');
 
   const controller2 = new AbortController();
   const t2 = setTimeout(() => controller2.abort(), 25000);
@@ -238,6 +220,9 @@ async function generateAIImage(prompt, options = {}) {
   if (aspect_ratio === '9:16') {
     width = 576;
     height = 1024;
+  } else if (aspect_ratio === '4:5') {
+    width = 768;
+    height = 960;
   } else if (aspect_ratio === '1:1') {
     width = 768;
     height = 768;
@@ -254,7 +239,7 @@ async function generateAIImage(prompt, options = {}) {
     .trim()
     .slice(0, 450);
 
-  // 1A. SubNP High-Speed Photorealistic Engine
+  // 1A. SubNP Free Photorealistic Engine
   try {
     const subnpRes = await callSubnpFreeImage(cleanTextPrompt, 'magic');
     if (subnpRes && subnpRes.buffer) {
@@ -309,15 +294,13 @@ async function generateAIImage(prompt, options = {}) {
         body: JSON.stringify({
           prompt: cleanTextPrompt,
           numberOfImages: 1,
-          aspectRatio: aspect_ratio === '9:16' ? '9:16' : '16:9'
+          aspectRatio: aspect_ratio === '9:16' ? '9:16' : aspect_ratio === '4:5' ? '3:4' : '16:9'
         })
       });
       if (res.ok) {
         const data = await res.json();
         const base64 = data.generatedImages?.[0]?.image?.imageBytes;
-        if (base64) {
-          return `data:image/jpeg;base64,${base64}`;
-        }
+        if (base64) return `data:image/jpeg;base64,${base64}`;
       }
     } catch (e) {
       console.warn('[AI Image Gemini Notice]:', e.message);
@@ -345,58 +328,42 @@ async function generateAIImage(prompt, options = {}) {
   return null;
 }
 
-/**
- * Resolve Visual Style into English for Image Generation
- */
-async function resolveVisualStyle(styleInput, rawConcept) {
-  const embeddedMatch = String(rawConcept || '').match(/visual\s*style(?:\s*reference)?[^:\n]*:\s*([^\r\n]+)/i);
-  if (embeddedMatch && embeddedMatch[1].trim()) {
-    const extracted = embeddedMatch[1].trim();
-    return /[\u0E00-\u0E7F]/.test(extracted) ? await translateToEnglish(extracted) : extracted;
-  }
-
+async function resolveVisualStyle(styleInput, rawConcept, mode = 'video') {
   const cleanStyle = String(styleInput || '').trim();
   if (!cleanStyle || cleanStyle === 'auto' || cleanStyle.includes('อัตโนมัติ')) {
-    const text = String(rawConcept || '').toLowerCase();
-    if (/asmr|มาโคร|macro|craftsmanship|สัมผัส/.test(text)) {
-      return 'macro photography, hyper-realistic, soft natural daylight, premium commercial style, sharp tactile details';
+    if (mode === 'photo') {
+      return 'Kinfolk & Cereal editorial lifestyle photography, natural golden hour light, Kodak Portra 400 organic film color palette, rich depth, photorealistic 8k';
     }
-    if (/วัด|พระ|โบราณ|เมืองเก่า|temple/.test(text)) {
-      return 'warm golden hour sunlight, rich cultural travel photography, cinematic depth of field, vibrant natural colors, 8k';
-    }
-    if (/คาเฟ่|กาแฟ|มัทฉะ|อาหาร|ขนม|ของกิน|cafe|food/.test(text)) {
-      return 'bright natural window daylight, appetizing lifestyle food & cafe cinematography, shallow depth of field, warm aesthetic';
-    }
-    if (/ทะเล|ชายหาด|ภูเขา|ดอย|ธรรมชาติ|แคมป์|beach|mountain/.test(text)) {
-      return 'crisp sunny travel vlog photography, vibrant sky and natural scenery, golden hour rim lighting, photorealistic 8k';
-    }
-    return 'bright natural daylight, high-end lifestyle travel & creator cinematography, shallow depth of field, hyper-realistic 8k';
+    return 'bright natural daylight, viral aesthetic lifestyle travel reel cinematography, shallow depth of field, vibrant natural color grading, 8k';
   }
-
   if (/[\u0E00-\u0E7F]/.test(cleanStyle)) {
     const tr = await translateToEnglish(cleanStyle);
-    return `${tr}, photorealistic, high detail`;
+    return `${tr}, editorial lifestyle photography, photorealistic, high detail`;
   }
   return cleanStyle;
 }
 
 /**
- * Plan Storyboard Shots — Connected, Cohesive, Practical Shooting Guide
+ * Plan Storyboard Shots — Dual Mode ('photo' | 'video')
  */
 async function planStoryboard({
+  mode = 'video', // 'photo' | 'video'
   story_concept,
   num_shots = 0,
-  target_duration = 20,
+  target_duration = 18,
   pacing = 'normal',
   visual_style = 'auto',
   camera_breakdown = 'auto_story',
-  aspect_ratio = '9:16'
+  aspect_ratio
 }) {
+  const activeMode = mode === 'photo' ? 'photo' : 'video';
+  const defaultAspect = activeMode === 'photo' ? '4:5' : '9:16';
+  const finalAspect = aspect_ratio || defaultAspect;
   const rawText = String(story_concept || '').trim();
-  const resolvedStyleEn = await resolveVisualStyle(visual_style, rawText);
+  const resolvedStyleEn = await resolveVisualStyle(visual_style, rawText, activeMode);
 
-  // 1. Check if user pasted a multi-scene numbered script
-  const parsed = parseMultiSceneScript(rawText);
+  // 1. Check if user pasted a structured multi-scene script
+  const parsed = parseMultiSceneScript(rawText, activeMode);
   if (parsed && parsed.shots && parsed.shots.length >= 2) {
     const enrichedShots = await Promise.all(parsed.shots.map(async (s, idx) => {
       let enPrompt = s.prompt || s.title;
@@ -406,9 +373,10 @@ async function planStoryboard({
       }
       const updated = {
         ...s,
+        mode: activeMode,
         shot_number: idx + 1,
         step_number: idx + 1,
-        aspect_ratio: aspect_ratio || '9:16',
+        aspect_ratio: finalAspect,
         prompt: enPrompt,
         content: enPrompt
       };
@@ -417,27 +385,30 @@ async function planStoryboard({
     }));
     return {
       ...parsed,
+      mode: activeMode,
       shots: enrichedShots
     };
   }
 
   // 2. Determine Target Shot Count
   let targetCount = 0;
-  const countMatch = rawText.match(/(?:ขอ|เอา|อยากได้|สร้าง|ทำ|จำนวน)?\s*(\d+)\s*(?:ฉาก|ช็อต|ซีน|ช้อต|ตอน|shots?|scenes?|cuts?)/i);
+  const countMatch = rawText.match(/(?:ขอ|เอา|อยากได้|สร้าง|ทำ|จำนวน)?\s*(\d+)\s*(?:ฉาก|ช็อต|ซีน|ภาพ|รูป|ช้อต|ตอน|shots?|scenes?|photos?)/i);
   if (countMatch) {
     targetCount = parseInt(countMatch[1], 10);
   } else if (num_shots && Number(num_shots) >= 2) {
     targetCount = parseInt(num_shots, 10);
   } else {
-    targetCount = 6; // Ideal 6-scene story arc (Hook -> Walk-in -> Highlight -> Detail -> Emotion -> CTA)
+    targetCount = 6;
   }
-  targetCount = Math.max(2, Math.min(12, targetCount || 6));
+  targetCount = Math.max(2, Math.min(10, targetCount || 6));
 
   const cleanTopic = extractCleanSubject(rawText);
   const topicEn = await translateToEnglish(cleanTopic);
 
-  // 3. Build deeply connected story beats tailored to the user's topic
-  const connectedBeats = buildConnectedStoryBeats(rawText, targetCount);
+  // 3. Generate tailored Photo Set OR Viral Lifestyle Video Arc
+  const rawBeats = activeMode === 'photo'
+    ? buildMasterPhotoStoryboard(rawText, targetCount)
+    : buildViralLifestyleVideoBeats(rawText, targetCount, visual_style);
 
   let curTime = 0;
   const formatSec = (seconds) => {
@@ -447,12 +418,11 @@ async function planStoryboard({
     return `${mins}:${sStr}`;
   };
 
-  const shots = await Promise.all(connectedBeats.map(async (beat, idx) => {
+  const shots = await Promise.all(rawBeats.map(async (beat, idx) => {
     const shotNum = idx + 1;
-    const roleInfo = getShotNarrativeRole(idx, connectedBeats.length);
-    const dur = beat.duration || roleInfo.defaultDuration || 3.0;
+    const roleInfo = getShotNarrativeRole(idx, rawBeats.length, activeMode);
+    const dur = activeMode === 'photo' ? 0 : (beat.duration || roleInfo.defaultDuration || 2.5);
 
-    // Ensure English prompt is 100% English and specific to the user's topic + beat
     let promptEn = beat.promptEn || '';
     if (/[\u0E00-\u0E7F]/.test(promptEn) || !promptEn) {
       const actionEn = await translateToEnglish(beat.action || beat.title);
@@ -461,48 +431,70 @@ async function planStoryboard({
       promptEn = `${promptEn}, ${resolvedStyleEn}`;
     }
 
+    const prefix = activeMode === 'photo' ? 'ภาพที่' : 'ฉากที่';
     const shotObj = {
+      mode: activeMode,
       shot_number: shotNum,
       step_number: shotNum,
       scene_number: shotNum,
-      scene_title: roleInfo.role,
-      shot_role: roleInfo.role,
-      title: `ฉากที่ ${shotNum}: ${beat.title}`,
+      scene_title: beat.shot_role || roleInfo.role,
+      shot_role: beat.shot_role || roleInfo.role,
+      title: `${prefix} ${shotNum}: ${beat.title}`,
       subtitle: `${beat.angleTh} • ${beat.lens}`,
       camera_angle: beat.angle,
       camera_angle_th: beat.angleTh,
-      camera_movement: beat.movement,
+      camera_movement: beat.movement || (activeMode === 'photo' ? 'นิ่ง / กดถ่ายรัวเก็บจังหวะ' : 'เคลื่อนกล้องนุ่มนวล'),
       lens_focal: beat.lens,
       shot_size: beat.lens,
       duration_seconds: dur,
+      master_photographer: beat.masterPhotographer || null,
+      depth_technique: beat.depthTechnique || null,
+      story_meaning: beat.storyMeaning || null,
+      pose_guide: beat.poseGuide || null,
+      lighting_tip: beat.lightingTip || null,
+      transition_tip: beat.transitionTip || null,
       action_description: beat.action,
-      dialogue: beat.dialogue,
-      dialogue_script: beat.dialogue,
-      audio_foley: beat.foley,
-      on_screen_text: beat.onScreenText,
+      dialogue: beat.dialogue || '',
+      dialogue_script: beat.dialogue || '',
+      audio_foley: beat.foley || '',
+      on_screen_text: beat.onScreenText || '',
       live_action_guide: beat.spaceGuide || roleInfo.textSafeZone,
       prompt: promptEn,
       content: promptEn,
-      video_prompt: `[Camera: ${beat.movement}] [Angle: ${beat.angle}] ${promptEn}`,
-      visual_style: visual_style === 'auto' ? 'แสงธรรมชาติคมชัด สไตล์ครีเอเตอร์' : visual_style,
-      aspect_ratio: aspect_ratio || '9:16'
+      video_prompt: `[Camera: ${beat.movement || 'Smooth'}] [Angle: ${beat.angle}] ${promptEn}`,
+      visual_style: visual_style === 'auto' ? 'Editorial Lifestyle Natural' : visual_style,
+      aspect_ratio: finalAspect
     };
 
     shotObj.image_url = getStoryboardSketch(shotObj);
     return shotObj;
   }));
 
-  // Compute cumulative timecodes synchronously
   shots.forEach((s) => {
-    const startSec = curTime;
-    const endSec = Math.round((startSec + s.duration_seconds) * 10) / 10;
-    curTime = endSec;
-    s.timecode = `${formatSec(startSec)} - ${formatSec(endSec)} (${s.duration_seconds}s)`;
+    if (activeMode === 'photo') {
+      s.timecode = `Slide ${s.step_number}/${shots.length}`;
+    } else {
+      const startSec = curTime;
+      const endSec = Math.round((startSec + s.duration_seconds) * 10) / 10;
+      curTime = endSec;
+      s.timecode = `${formatSec(startSec)} - ${formatSec(endSec)}`;
+    }
   });
 
+  const viralHook = activeMode === 'photo'
+    ? `เซ็ตภาพนิ่งไลฟ์สไตล์ ${shots.length} มุม ได้แรงบันดาลใจจากช่างภาพระดับโลก (Fan Ho, Saul Leiter, Steve McCurry, Peter Lindbergh)`
+    : `สูตรไวรัลไลฟ์สไตล์ ${shots.length} ฉาก (${curTime} วิ) — เปิด Hook หยุดนิ้วใน 2.5 วิแรก + B-Roll เร่งจังหวะ + จบชวนกดเซฟ`;
+
+  const musicVibe = activeMode === 'photo'
+    ? '🎨 โทนสีแนะนำ: Warm Film / Kodak Portra (ปรับ Warmth +10, Shadows +15, Contrast +5)'
+    : '🎵 แนวเพลงแนะนำ: Indie Pop / Acoustic Lo-Fi จังหวะสนุก (105-120 BPM) ตัดเข้าจังหวะบีท';
+
   return {
+    mode: activeMode,
     project_title: cleanTopic,
-    logline: `สตอรี่บอร์ดพร้อมถ่าย ${shots.length} ฉาก (${curTime} วินาที) สำหรับ "${cleanTopic}"`,
+    viral_hook: viralHook,
+    music_vibe: musicVibe,
+    logline: viralHook,
     total_shots: shots.length,
     total_duration: curTime,
     target_duration: curTime,

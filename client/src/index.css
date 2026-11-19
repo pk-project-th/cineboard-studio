@@ -2,49 +2,114 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  --bg-canvas: #F7F5F0;
+  --bg-surface: #FFFFFF;
+  --bg-subtle: #F2EFE8;
+  --bg-elevated: #FAF8F4;
+  --border-subtle: rgba(24, 24, 27, 0.09);
+  --border-strong: rgba(24, 24, 27, 0.16);
+  --text-primary: #18181B;
+  --text-secondary: #3F3F46;
+  --text-muted: #71717A;
+  --accent: #D97706;
+  --accent-hover: #B45309;
+}
+
+.dark-theme {
+  --bg-canvas: #0C0E13;
+  --bg-surface: #141720;
+  --bg-subtle: #1B202C;
+  --bg-elevated: #10131B;
+  --border-subtle: rgba(255, 255, 255, 0.08);
+  --border-strong: rgba(255, 255, 255, 0.16);
+  --text-primary: #F4F4F5;
+  --text-secondary: #D4D4D8;
+  --text-muted: #A1A1AA;
+  --accent: #F59E0B;
+  --accent-hover: #FBBF24;
+}
+
 @layer base {
+  html,
   body {
-    @apply bg-[#0B0D11] text-[#F1F5F9] font-sans antialiased selection:bg-amber-500/30 selection:text-amber-200;
+    max-width: 100%;
+    overflow-x: hidden;
+    min-height: 100dvh;
+    font-family: 'Prompt', 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+    background-color: var(--bg-canvas);
+    color: var(--text-primary);
+    -webkit-font-smoothing: antialiased;
+    transition: background-color 0.2s ease, color 0.2s ease;
+  }
+
+  /* Prevent iOS Safari auto-zoom on mobile inputs */
+  @media (max-width: 767px) {
+    input,
+    select,
+    textarea {
+      font-size: 16px !important;
+    }
   }
 }
 
-/* Custom Scrollbar for Dark Studio Canvas */
-::-webkit-scrollbar {
-  width: 7px;
-  height: 7px;
-}
-::-webkit-scrollbar-track {
-  background: #0F1218;
-}
-::-webkit-scrollbar-thumb {
-  background: #262C3A;
-  border-radius: 4px;
-}
-::-webkit-scrollbar-thumb:hover {
-  background: #3B4459;
-}
-
-/* Studio Card Surface */
-.studio-card {
-  background: #131720;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  box-shadow: 0 8px 24px -6px rgba(0, 0, 0, 0.45);
+/* Editorial Card Surface */
+.editorial-card {
+  background-color: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  box-shadow:
+    0 1px 2px rgba(24, 24, 27, 0.04),
+    0 8px 24px -8px rgba(24, 24, 27, 0.07);
   transition: border-color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
 }
 
-.studio-card:hover {
-  border-color: rgba(245, 158, 11, 0.35);
-  box-shadow: 0 12px 32px -6px rgba(0, 0, 0, 0.65);
+.dark-theme .editorial-card {
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.35),
+    0 12px 28px -8px rgba(0, 0, 0, 0.55);
 }
 
-/* Shimmer animation for AI rendering */
-@keyframes pulseGlow {
-  0%, 100% { opacity: 0.55; }
-  50% { opacity: 1; }
+.editorial-card:hover {
+  border-color: rgba(217, 119, 6, 0.38);
 }
 
-.ai-rendering-glow {
-  animation: pulseGlow 1.8s ease-in-out infinite;
+/* Tactile Button Interaction */
+.btn-tactile {
+  transition: transform 150ms ease-out, background-color 150ms ease-out, border-color 150ms ease-out, box-shadow 150ms ease-out;
+}
+.btn-tactile:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .editorial-card,
+  .btn-tactile {
+    transition: none !important;
+  }
+}
+
+/* Subtle Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(113, 113, 122, 0.28);
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(113, 113, 122, 0.48);
+}
+
+/* Safe area padding for iOS notch / home bar */
+.safe-top {
+  padding-top: env(safe-area-inset-top, 0px);
+}
+.safe-bottom {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
 }
 
 /* Clean Print Layout */
@@ -56,7 +121,7 @@
   .no-print {
     display: none !important;
   }
-  .studio-card {
+  .editorial-card {
     background: #FFFFFF !important;
     border: 1px solid #D4D4D8 !important;
     box-shadow: none !important;

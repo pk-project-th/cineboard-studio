@@ -5,15 +5,21 @@ const fs = require('fs');
 const db = require('./db');
 const config = require('./config');
 const { getStoryboardSketch } = require('./sketchHelper');
-const { parseMultiSceneScript } = require('./scriptParser');
 const aiService = require('./aiService');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
 
 app.use(cors());
-app.use(express.json({ limit: '100mb' }));
-app.use(express.urlencoded({ limit: '100mb', extended: true }));
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ limit: '50mb', extended: true }));
+
+// Ensure uploads directory exists and is served statically in BOTH dev & production
+const uploadsDir = path.join(__dirname, '..', 'client', 'public', 'uploads');
+if (!fs.existsSync(uploadsDir)) {
+  fs.mkdirSync(uploadsDir, { recursive: true });
+}
+app.use('/uploads', express.static(uploadsDir));
 
 // Request logger
 app.use((req, res, next) => {
@@ -21,6 +27,10 @@ app.use((req, res, next) => {
     console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
   }
   next();
+});
+
+app.get('/api/health', (req, res) => {
+  res.json({ success: true, status: 'ok', timestamp: new Date().toISOString() });
 });
 
 // ==========================================
@@ -109,103 +119,32 @@ app.get('/api/prompts', (req, res) => {
   }
 });
 
-// Generate / Append a single shot into a project
-app.post('/api/generate', async (req, res) => {
-  try {
-    const {
-      prompt,
-      title = 'ช็อตสร้างใหม่',
-      aspect_ratio = '9:16',
-      series_id = null
-    } = req.body;
-
-    if (!prompt || !prompt.trim()) {
-      return res.status(400).json({ success: false, error: 'กรุณากรอกคำสั่ง Prompt' });
-    }
-
-    let imageUrl = await aiService.generateAIImage(prompt, { aspect_ratio });
-    if (!imageUrl) {
-      imageUrl = getStoryboardSketch({
-        prompt,
-        title,
-        action_description: prompt,
-        camera_angle: 'Medium Shot',
-        aspect_ratio
-      });
-    }
-
-    const id = 'pk-gen-' + Date.now();
-    const countQuery = db.prepare('SELECT COUNT(*) as c FROM prompts').get();
-    const sort_order = (countQuery.c || 0) + 1;
-
-    let targetSeriesId = series_id;
-    if (!targetSeriesId || targetSeriesId === 'all') {
-      const latestSeries = db.prepare('SELECT id FROM series ORDER BY created_at DESC LIMIT 1').get();
-      targetSeriesId = latestSeries ? latestSeries.id : 'series-default';
-    }
-
-    const insertStmt = db.prepare(`
-      INSERT INTO prompts (
-        id, series_id, step_number, step_title, title, subtitle,
-        prompt_type, recommended_tool, aspect_ratio, content,
-        dialogue_script, variables_schema, image_url, copy_count,
-        sort_order, is_active, camera_angle, action_description, video_prompt
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, 1, ?, ?, ?)
-    `);
-
-    insertStmt.run(
-      id,
-      targetSeriesId,
-      1,
-      'ช็อตเดี่ยว',
-      title,
-      'ภาพเดี่ยวจาก AI Prompt',
-      'first_frame',
-      'AI Image Generator',
-      aspect_ratio,
-      prompt,
-      '',
-      null,
-      imageUrl,
-      sort_order,
-      'Medium Shot',
-      prompt,
-      `Smooth cinematic camera motion capturing ${prompt}`
-    );
-
-    const inserted = db.prepare('SELECT * FROM prompts WHERE id = ?').get(id);
-    res.json({ success: true, data: inserted });
-  } catch (err) {
-    console.error('[Generate Exception]:', err);
-    res.status(500).json({ success: false, error: err.message });
-  }
-});
-
 // Generate or Regenerate real AI image for a specific shot
 app.post('/api/prompts/:id/generate-image', async (req, res) => {
   try {
     const { id } = req.params;
     const promptRow = db.prepare('SELECT * FROM prompts WHERE id = ?').get(id);
-    if (!promptRow) {
-      return res.status(404).json({ success: false, error: 'ไม่พบช็อตนี้ในระบบ' });
-    }
 
     const {
-      prompt = promptRow.content || promptRow.title,
-      aspect_ratio = promptRow.aspect_ratio || '9:16'
+      prompt = promptRow?.content || promptRow?.title || 'aesthetic lifestyle travel photography',
+      aspect_ratio = promptRow?.aspect_ratio || '9:16'
     } = req.body;
 
     console.log(`[AI Shot Image] Generating image for shot ${id}...`);
     const imgUrl = await aiService.generateAIImage(prompt, { aspect_ratio });
 
     if (imgUrl) {
-      db.prepare('UPDATE prompts SET image_url = ?, aspect_ratio = ? WHERE id = ?').run(imgUrl, aspect_ratio, id);
-      const updated = db.prepare('SELECT * FROM prompts WHERE id = ?').get(id);
-      return res.json({ success: true, data: updated, image_url: imgUrl });
+      if (promptRow) {
+        db.prepare('UPDATE prompts SET image_url = ?, aspect_ratio = ? WHERE id = ?').run(imgUrl, aspect_ratio, id);
+        const updated = db.prepare('SELECT * FROM prompts WHERE id = ?').get(id);
+        return res.json({ success: true, data: updated, image_url: imgUrl });
+      }
+      // Support client-cached shots even if Render DB was reset!
+      return res.json({ success: true, data: { id, image_url: imgUrl }, image_url: imgUrl });
     } else {
-      return res.status(500).json({
+      return res.status(503).json({
         success: false,
-        error: 'ระบบสร้างภาพ AI ขัดข้องชั่วคราว กรุณาลองกดวาดใหม่อีกครั้งครับ'
+        error: 'ระบบวาดภาพ AI ใช้งานหนาแน่นชั่วคราว ลองกดวาดใหม่อีกครั้งได้เลยครับ'
       });
     }
   } catch (err) {
@@ -220,7 +159,7 @@ app.put('/api/prompts/:id', (req, res) => {
     const { id } = req.params;
     const existing = db.prepare('SELECT * FROM prompts WHERE id = ?').get(id);
     if (!existing) {
-      return res.status(404).json({ success: false, error: 'ไม่พบช็อตนี้ในระบบ' });
+      return res.json({ success: true, data: { id, ...req.body }, localOnly: true });
     }
 
     const {
@@ -236,6 +175,12 @@ app.put('/api/prompts/:id', (req, res) => {
       live_action_guide,
       shot_role,
       is_completed,
+      master_photographer,
+      depth_technique,
+      story_meaning,
+      pose_guide,
+      lighting_tip,
+      transition_tip,
       video_prompt,
       visual_style,
       duration_seconds,
@@ -257,6 +202,12 @@ app.put('/api/prompts/:id', (req, res) => {
         live_action_guide = COALESCE(?, live_action_guide),
         shot_role = COALESCE(?, shot_role),
         is_completed = COALESCE(?, is_completed),
+        master_photographer = COALESCE(?, master_photographer),
+        depth_technique = COALESCE(?, depth_technique),
+        story_meaning = COALESCE(?, story_meaning),
+        pose_guide = COALESCE(?, pose_guide),
+        lighting_tip = COALESCE(?, lighting_tip),
+        transition_tip = COALESCE(?, transition_tip),
         video_prompt = COALESCE(?, video_prompt),
         visual_style = COALESCE(?, visual_style),
         duration_seconds = COALESCE(?, duration_seconds),
@@ -276,6 +227,12 @@ app.put('/api/prompts/:id', (req, res) => {
       live_action_guide,
       shot_role,
       is_completed !== undefined ? (is_completed ? 1 : 0) : null,
+      master_photographer,
+      depth_technique,
+      story_meaning,
+      pose_guide,
+      lighting_tip,
+      transition_tip,
       video_prompt,
       visual_style,
       duration_seconds,
@@ -291,7 +248,7 @@ app.put('/api/prompts/:id', (req, res) => {
   }
 });
 
-// Batch update prompts (reordering, batch editing)
+// Batch update prompts
 app.put('/api/prompts-batch', (req, res) => {
   try {
     const { updates } = req.body;
@@ -313,6 +270,12 @@ app.put('/api/prompts-batch', (req, res) => {
         on_screen_text = COALESCE(?, on_screen_text),
         live_action_guide = COALESCE(?, live_action_guide),
         shot_role = COALESCE(?, shot_role),
+        master_photographer = COALESCE(?, master_photographer),
+        depth_technique = COALESCE(?, depth_technique),
+        story_meaning = COALESCE(?, story_meaning),
+        pose_guide = COALESCE(?, pose_guide),
+        lighting_tip = COALESCE(?, lighting_tip),
+        transition_tip = COALESCE(?, transition_tip),
         video_prompt = COALESCE(?, video_prompt),
         audio_foley = COALESCE(?, audio_foley)
       WHERE id = ?
@@ -333,6 +296,12 @@ app.put('/api/prompts-batch', (req, res) => {
           item.on_screen_text,
           item.live_action_guide,
           item.shot_role,
+          item.master_photographer,
+          item.depth_technique,
+          item.story_meaning,
+          item.pose_guide,
+          item.lighting_tip,
+          item.transition_tip,
           item.video_prompt,
           item.audio_foley,
           item.id
@@ -350,37 +319,18 @@ app.put('/api/prompts-batch', (req, res) => {
 app.delete('/api/prompts/:id', (req, res) => {
   try {
     const { id } = req.params;
-    const result = db.prepare('DELETE FROM prompts WHERE id = ?').run(id);
-    if (result.changes === 0) {
-      return res.status(404).json({ success: false, error: 'ไม่พบช็อตที่ต้องการลบ' });
-    }
+    db.prepare('DELETE FROM prompts WHERE id = ?').run(id);
     res.json({ success: true, message: 'ลบช็อตเรียบร้อย' });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
 });
 
-// Copy counter
 app.post('/api/prompts/:id/copy', (req, res) => {
   try {
     const { id } = req.params;
     db.prepare('UPDATE prompts SET copy_count = copy_count + 1 WHERE id = ?').run(id);
-    const updated = db.prepare('SELECT id, copy_count FROM prompts WHERE id = ?').get(id);
-    res.json({ success: true, data: updated });
-  } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
-  }
-});
-
-// Toggle/Reset shot image to framing guide SVG
-app.post('/api/prompts/:id/sketch', (req, res) => {
-  try {
-    const prompt = db.prepare('SELECT * FROM prompts WHERE id = ?').get(req.params.id);
-    if (!prompt) return res.status(404).json({ success: false, error: 'ไม่พบช็อต' });
-    const sketch = getStoryboardSketch(prompt);
-    db.prepare("UPDATE prompts SET image_url = ?, visual_style = 'sketch' WHERE id = ?").run(sketch, req.params.id);
-    const updated = db.prepare('SELECT * FROM prompts WHERE id = ?').get(req.params.id);
-    res.json({ success: true, data: updated });
+    res.json({ success: true });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
@@ -393,22 +343,24 @@ app.post('/api/prompts/:id/sketch', (req, res) => {
 app.post('/api/storyboard/ai-plan', async (req, res) => {
   try {
     const {
+      mode = 'video',
       story_concept,
       num_shots = 0,
-      target_duration = 20,
+      target_duration = 18,
       pacing = 'normal',
       style = 'auto',
       visual_style = 'auto',
       camera_breakdown = 'auto_story',
-      aspect_ratio = '9:16'
+      aspect_ratio
     } = req.body;
 
     if (!story_concept || !story_concept.trim()) {
-      return res.status(400).json({ success: false, error: 'กรุณาระบุโจทย์หรือเนื้อเรื่องที่ต้องการถ่าย' });
+      return res.status(400).json({ success: false, error: 'กรุณาระบุโจทย์หรือสถานที่ที่ต้องการถ่ายครับ' });
     }
 
     const chosenStyle = visual_style || style || 'auto';
     const planData = await aiService.planStoryboard({
+      mode,
       story_concept,
       num_shots,
       target_duration,
@@ -429,24 +381,28 @@ app.post('/api/storyboard/ai-plan', async (req, res) => {
   }
 });
 
-// Commit planned shots into the board as prompts
 app.post('/api/storyboard/commit-shots', async (req, res) => {
   try {
     const {
+      mode = 'video',
       shots,
       project_title,
-      visual_style = 'แสงธรรมชาติคมชัด สไตล์ครีเอเตอร์',
-      target_duration = 20,
+      viral_hook = '',
+      music_vibe = '',
+      visual_style = 'Editorial Lifestyle Natural',
+      target_duration = 18,
       pacing = 'normal',
-      aspect_ratio = '9:16'
+      aspect_ratio
     } = req.body;
 
     if (!shots || !Array.isArray(shots) || shots.length === 0) {
       return res.status(400).json({ success: false, error: 'ไม่พบรายการช็อต' });
     }
 
+    const activeMode = mode === 'photo' ? 'photo' : 'video';
+    const finalAspect = aspect_ratio || (activeMode === 'photo' ? '4:5' : '9:16');
     const seriesId = 'series-sb-' + Date.now();
-    const finalTitle = project_title || `สตอรี่บอร์ดพร้อมถ่าย (${shots.length} ฉาก)`;
+    const finalTitle = project_title || (activeMode === 'photo' ? `เซ็ตภาพนิ่ง (${shots.length} มุม)` : `สตอรี่บอร์ดวิดีโอ (${shots.length} ฉาก)`);
 
     let timeSec = 0;
     const formatSec = (seconds) => {
@@ -457,38 +413,41 @@ app.post('/api/storyboard/commit-shots', async (req, res) => {
     };
 
     const finalShots = shots.map((s, idx) => {
-      const dur = parseFloat(s.duration_seconds) || 3.0;
+      const dur = activeMode === 'photo' ? 0 : (parseFloat(s.duration_seconds) || 2.5);
       const startSec = timeSec;
       const endSec = Math.round((startSec + dur) * 10) / 10;
       timeSec = endSec;
 
       return {
         ...s,
+        mode: activeMode,
         step_number: idx + 1,
         sort_order: idx + 1,
         duration_seconds: dur,
-        aspect_ratio: s.aspect_ratio || aspect_ratio,
-        timecode: `${formatSec(startSec)} - ${formatSec(endSec)} (${dur}s)`
+        aspect_ratio: s.aspect_ratio || finalAspect,
+        timecode: activeMode === 'photo' ? `Slide ${idx + 1}/${shots.length}` : `${formatSec(startSec)} - ${formatSec(endSec)}`
       };
     });
 
     const totalDurationSec = Math.round(timeSec * 10) / 10;
 
-    // Create series entry
-    const insertSeries = db.prepare(`
-      INSERT INTO series (id, title, description, summary, target_duration, pacing)
-      VALUES (?, ?, ?, ?, ?, ?)
-    `);
-    insertSeries.run(
+    db.prepare(`
+      INSERT INTO series (id, title, description, summary, target_duration, pacing, mode, viral_hook, music_vibe)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
       seriesId,
       finalTitle,
-      `ความยาวรวม ${totalDurationSec} วิ (${shots.length} ฉาก • ${aspect_ratio})`,
-      `ไกด์ถ่ายคอนเทนต์ครบทุกฉาก: มุมกล้อง, วิธีถ่าย, พื้นที่วางข้อความ และบทพากย์`,
+      activeMode === 'photo'
+        ? `เซ็ตภาพนิ่ง ${shots.length} มุม • แรงบันดาลใจช่างภาพระดับโลก`
+        : `วิดีโอไลฟ์สไตล์ ${shots.length} ฉาก • ความยาวรวม ${totalDurationSec} วิ`,
+      viral_hook || `แผนการถ่ายทำฉบับสมบูรณ์`,
       totalDurationSec,
-      pacing
+      pacing,
+      activeMode,
+      viral_hook,
+      music_vibe
     );
 
-    // Insert all shots
     const insertPrompt = db.prepare(`
       INSERT INTO prompts (
         id, series_id, step_number, step_title, title, subtitle,
@@ -496,8 +455,9 @@ app.post('/api/storyboard/commit-shots', async (req, res) => {
         dialogue_script, variables_schema, image_url, reference_image,
         copy_count, sort_order, is_active, camera_angle, shot_size,
         video_prompt, audio_foley, on_screen_text, live_action_guide,
-        shot_role, is_completed, camera_movement,
-        action_description, visual_style, scene_number, scene_title,
+        shot_role, is_completed, mode,
+        master_photographer, depth_technique, story_meaning, pose_guide, lighting_tip, transition_tip,
+        camera_movement, action_description, visual_style, scene_number, scene_title,
         duration_seconds, timecode
       ) VALUES (
         ?, ?, ?, ?, ?, ?,
@@ -506,12 +466,14 @@ app.post('/api/storyboard/commit-shots', async (req, res) => {
         0, ?, 1, ?, ?,
         ?, ?, ?, ?,
         ?, 0, ?,
-        ?, ?, ?, ?,
+        ?, ?, ?, ?, ?, ?,
+        ?, ?, ?, ?, ?,
         ?, ?
       )
     `);
 
     const createdRows = [];
+    const labelPrefix = activeMode === 'photo' ? 'ภาพที่' : 'ฉากที่';
 
     for (const s of finalShots) {
       const pId = 'shot-' + Date.now() + '-' + s.step_number;
@@ -519,23 +481,24 @@ app.post('/api/storyboard/commit-shots', async (req, res) => {
       if (!finalImg || !finalImg.trim()) {
         finalImg = getStoryboardSketch({
           ...s,
+          mode: activeMode,
           step_number: s.step_number,
-          aspect_ratio: s.aspect_ratio || aspect_ratio
+          aspect_ratio: s.aspect_ratio || finalAspect
         });
       }
 
-      const roleText = s.shot_role || s.scene_title || (s.step_number === 1 ? '🎯 HOOK เปิดคลิป' : `ฉากที่ ${s.step_number}`);
+      const roleText = s.shot_role || s.scene_title || `${labelPrefix} ${s.step_number}`;
 
       insertPrompt.run(
         pId,
         seriesId,
         s.step_number,
-        `ฉากที่ ${s.step_number}`,
-        s.title || `ฉากที่ ${s.step_number}`,
-        s.camera_angle_th || s.camera_angle || 'มุมปานกลาง (Medium Shot)',
-        'first_frame',
-        'Mobile Camera / AI Visual',
-        s.aspect_ratio || aspect_ratio,
+        `${labelPrefix} ${s.step_number}`,
+        s.title || `${labelPrefix} ${s.step_number}`,
+        s.camera_angle_th || s.camera_angle || 'Medium Shot',
+        activeMode === 'photo' ? 'photo' : 'first_frame',
+        activeMode === 'photo' ? 'Master Photo Guide' : 'Viral Reels Director',
+        s.aspect_ratio || finalAspect,
         s.prompt || s.content || s.title,
         s.dialogue || s.dialogue_script || '',
         null,
@@ -544,12 +507,19 @@ app.post('/api/storyboard/commit-shots', async (req, res) => {
         s.sort_order,
         s.camera_angle || 'Medium Shot',
         s.lens_focal || s.shot_size || 'เลนส์ 1x',
-        s.video_prompt || `Cinematic camera motion capturing ${s.title}`,
-        s.audio_foley || 'เสียงบรรยากาศธรรมชาติและดนตรีประกอบ',
-        s.on_screen_text || `ฉากที่ ${s.step_number}`,
-        s.live_action_guide || '📐 เว้นพื้นที่ด้านบนหรือด้านล่าง 25% สำหรับวางข้อความพาดหัวไม่ให้บังตัวแบบ',
+        s.video_prompt || '',
+        s.audio_foley || '',
+        s.on_screen_text || '',
+        s.live_action_guide || '',
         roleText,
-        s.camera_movement || 'ถือกล้องนิ่ง / แพนช้าๆ',
+        activeMode,
+        s.master_photographer || null,
+        s.depth_technique || null,
+        s.story_meaning || null,
+        s.pose_guide || null,
+        s.lighting_tip || null,
+        s.transition_tip || null,
+        s.camera_movement || '',
         s.action_description || s.title,
         visual_style,
         s.scene_number || s.step_number,
@@ -561,9 +531,12 @@ app.post('/api/storyboard/commit-shots', async (req, res) => {
       createdRows.push(db.prepare('SELECT * FROM prompts WHERE id = ?').get(pId));
     }
 
+    const createdSeries = db.prepare('SELECT * FROM series WHERE id = ?').get(seriesId);
+
     res.json({
       success: true,
       series_id: seriesId,
+      series: { ...createdSeries, shot_count: createdRows.length, total_duration: totalDurationSec },
       total_shots: createdRows.length,
       total_duration: totalDurationSec,
       data: createdRows
@@ -582,62 +555,77 @@ app.post('/api/storyboard/append-shot', async (req, res) => {
       return res.status(400).json({ success: false, error: 'ข้อมูลไม่ครบถ้วน' });
     }
 
+    const parentSeries = db.prepare('SELECT * FROM series WHERE id = ?').get(series_id);
+    const activeMode = shot.mode || parentSeries?.mode || 'video';
     const currentShots = db.prepare('SELECT COUNT(*) as count FROM prompts WHERE series_id = ?').get(series_id);
     const nextStep = (currentShots.count || 0) + 1;
     const pId = 'shot-' + Date.now() + '-' + nextStep;
+    const labelPrefix = activeMode === 'photo' ? 'ภาพที่' : 'ฉากที่';
 
     const sketch = getStoryboardSketch({
       ...shot,
+      mode: activeMode,
       step_number: nextStep,
-      aspect_ratio: shot.aspect_ratio || '9:16'
+      aspect_ratio: shot.aspect_ratio || (activeMode === 'photo' ? '4:5' : '9:16')
     });
 
-    const insert = db.prepare(`
+    db.prepare(`
       INSERT INTO prompts (
         id, series_id, step_number, step_title, title, subtitle,
         prompt_type, recommended_tool, aspect_ratio, content,
         dialogue_script, image_url, copy_count, sort_order,
         is_active, camera_angle, shot_size, video_prompt,
         audio_foley, on_screen_text, live_action_guide, shot_role,
-        is_completed, camera_movement, action_description,
+        is_completed, mode,
+        master_photographer, depth_technique, story_meaning, pose_guide, lighting_tip, transition_tip,
+        camera_movement, action_description,
         visual_style, scene_number, scene_title, duration_seconds, timecode
       ) VALUES (
         ?, ?, ?, ?, ?, ?,
-        'first_frame', 'Mobile Camera / AI Visual', ?, ?,
+        ?, ?, ?, ?,
         ?, ?, 0, ?,
         1, ?, ?, ?,
         ?, ?, ?, ?,
-        0, ?, ?,
+        0, ?,
+        ?, ?, ?, ?, ?, ?,
+        ?, ?,
         ?, ?, ?, ?, ?
       )
-    `);
-
-    insert.run(
+    `).run(
       pId,
       series_id,
       nextStep,
-      `ฉากที่ ${nextStep}`,
-      shot.title || `ฉากที่ ${nextStep}`,
+      `${labelPrefix} ${nextStep}`,
+      shot.title || `${labelPrefix} ${nextStep}`,
       shot.camera_angle || 'Medium Shot',
-      shot.aspect_ratio || '9:16',
-      shot.prompt || shot.action_description || 'ฉากเพิ่มเติม',
+      activeMode === 'photo' ? 'photo' : 'first_frame',
+      activeMode === 'photo' ? 'Master Photo Guide' : 'Viral Reels Director',
+      shot.aspect_ratio || (activeMode === 'photo' ? '4:5' : '9:16'),
+      shot.prompt || shot.action_description || 'ช็อตเพิ่มเติม',
       shot.dialogue || '',
       shot.image_url || sketch,
       nextStep,
       shot.camera_angle || 'Medium Shot',
       shot.lens_focal || 'เลนส์ 1x',
-      shot.video_prompt || `Cinematic camera motion of ${shot.title || 'shot'}`,
-      shot.audio_foley || 'เสียงบรรยากาศ',
-      shot.on_screen_text || `ข้อความพาดหัวฉากที่ ${nextStep}`,
+      shot.video_prompt || '',
+      shot.audio_foley || '',
+      shot.on_screen_text || '',
       shot.live_action_guide || '📐 เว้นพื้นที่ว่างด้านบน 25% สำหรับใส่ข้อความ',
-      shot.shot_role || '✨ ฉากเสริม',
+      shot.shot_role || (activeMode === 'photo' ? '✨ มุมเสริมไลฟ์สไตล์' : '✨ ฉากเสริม'),
+      activeMode,
+      shot.master_photographer || (activeMode === 'photo' ? 'Henri Cartier-Bresson — จังหวะธรรมชาติ' : null),
+      shot.depth_technique || (activeMode === 'photo' ? 'จัดองค์ประกอบ 3 ระยะ (ฉากหน้า-ตัวแบบ-ฉากหลัง)' : null),
+      shot.story_meaning || (activeMode === 'photo' ? 'เพิ่มมิติและเรื่องราวให้เซ็ตภาพสมบูรณ์ขึ้น' : null),
+      shot.pose_guide || (activeMode === 'photo' ? 'โพสท่าสบายๆ เป็นธรรมชาติ' : null),
+      shot.lighting_tip || '☀️ ใช้แสงธรรมชาติเฉียง 45°',
+      shot.transition_tip || (activeMode === 'video' ? '✂️ ตัดเข้าจังหวะบีทเพลง' : null),
       shot.camera_movement || 'ถือกล้องนิ่ง / เคลื่อนตามเบาๆ',
       shot.action_description || shot.prompt || '',
-      shot.visual_style || 'แสงธรรมชาติคมชัด',
-      shot.scene_number || nextStep,
-      shot.scene_title || 'ฉากเพิ่มเติม',
-      shot.duration_seconds || 3.0,
-      `${nextStep * 3.0}s`
+      shot.visual_style || 'Editorial Lifestyle Natural',
+      nextStep,
+      shot.scene_title || 'ช็อตเพิ่มเติม',
+      activeMode === 'photo' ? 0 : (shot.duration_seconds || 2.5),
+      activeMode === 'photo' ? `Slide ${nextStep}` : `${nextStep * 2.5}s`
     );
 
     const inserted = db.prepare('SELECT * FROM prompts WHERE id = ?').get(pId);
@@ -688,50 +676,24 @@ app.post('/api/upload', (req, res) => {
     if (!image) {
       return res.status(400).json({ success: false, error: 'กรุณาแนบไฟล์รูปภาพ' });
     }
-
     const matches = image.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
     if (!matches || matches.length !== 3) {
-      return res.status(400).json({ success: false, error: 'รูปแบบรูปภาพ Base64 ไม่ถูกต้อง' });
+      return res.status(400).json({ success: false, error: 'รูปแบบรูปภาพไม่ถูกต้อง' });
     }
-
-    const ext = filename ? path.extname(filename).toLowerCase() || '.png' : '.png';
+    // Also save a copy on disk AND return the data URI so it NEVER 404s even on Render ephemeral restarts!
+    const ext = filename ? path.extname(filename).toLowerCase() || '.jpg' : '.jpg';
     const cleanBaseName = filename ? path.basename(filename, ext).replace(/[^a-zA-Z0-9_-]/g, '_') : 'image';
     const uniqueFileName = `ref_${Date.now()}_${cleanBaseName}${ext}`;
-
-    const uploadsDir = path.join(__dirname, '..', 'client', 'public', 'uploads');
-    if (!fs.existsSync(uploadsDir)) {
-      fs.mkdirSync(uploadsDir, { recursive: true });
-    }
-
     const filePath = path.join(uploadsDir, uniqueFileName);
     const buffer = Buffer.from(matches[2], 'base64');
     fs.writeFileSync(filePath, buffer);
 
-    const publicUrl = `/uploads/${uniqueFileName}`;
     res.json({
       success: true,
       data: {
-        url: publicUrl,
+        url: image, // Safe persistent Data URI (compressed on client)
+        disk_url: `/uploads/${uniqueFileName}`,
         size_mb: (buffer.length / (1024 * 1024)).toFixed(2)
-      }
-    });
-  } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
-  }
-});
-
-app.get('/api/stats', (req, res) => {
-  try {
-    const totalPrompts = db.prepare('SELECT COUNT(*) as count FROM prompts WHERE is_active = 1').get();
-    const totalSeries = db.prepare('SELECT COUNT(*) as count FROM series').get();
-    const totalCopies = db.prepare('SELECT SUM(copy_count) as total FROM prompts').get();
-
-    res.json({
-      success: true,
-      data: {
-        totalPrompts: totalPrompts.count,
-        totalSeries: totalSeries.count,
-        totalCopies: totalCopies.total || 0
       }
     });
   } catch (err) {

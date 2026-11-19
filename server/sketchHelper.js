@@ -1,8 +1,7 @@
-// CineBoard Studio — Visual Framing, Subject Composition & Text Safe-Zone Guide
-// Generates an easy-to-read illustrated storyboard frame showing:
-// 1. Subject silhouette & framing based on Camera Angle (Wide, Medium, Close-up, POV, Low-angle)
-// 2. Text Overlay Safe-Zone (where to leave empty space in the frame for titles/captions)
-// 3. Camera movement direction arrows & phone lens guide
+// CineBoard Studio — Editorial Framing, Composition & Safe-Zone Visual Guide
+// Supports Dual Modes:
+//   1. PHOTO MODE: World-class composition diagrams (Foreground Layering, Leading Lines, Chiaroscuro Light Rays, Rule of Thirds)
+//   2. VIDEO MODE: Viral Reels/TikTok framing, camera movement arrows & Text Safe-Zone guide
 
 function escapeXml(unsafe) {
   if (!unsafe) return '';
@@ -14,135 +13,182 @@ function escapeXml(unsafe) {
     .replace(/'/g, '&apos;');
 }
 
-function buildSubjectIllustration(angleStr, cx, cy, width, height, isVertical) {
-  const a = String(angleStr || '').toLowerCase();
+function buildPhotoCompositionArt(shot, cx, cy, width, height) {
+  const tech = String((shot?.master_photographer || '') + ' ' + (shot?.depth_technique || '') + ' ' + (shot?.camera_angle || '')).toLowerCase();
 
-  // 1. Extreme Close-Up / Macro / Detail Shot (เน้นมือจับ/อาหาร/ดีเทลใกล้ๆ)
-  if (/macro|extreme close|close-up|closeup|มาโคร|มุมใกล้|เจาะ/.test(a)) {
-    const r = isVertical ? 140 : 120;
+  // 1. Saul Leiter: Foreground Layering / Frame through glass or foliage
+  if (/leiter|layer|ฉากหน้า|ลอดผ่าน|กระจก|ใบไม้/.test(tech)) {
     return `
-      <!-- Bokeh Background Circles -->
-      <circle cx="${cx - 180}" cy="${cy - 90}" r="45" fill="rgba(251, 191, 36, 0.08)" />
-      <circle cx="${cx + 200}" cy="${cy - 60}" r="60" fill="rgba(56, 189, 248, 0.08)" />
-      <circle cx="${cx - 120}" cy="${cy + 80}" r="35" fill="rgba(251, 191, 36, 0.06)" />
-      <!-- Macro Focus Ring -->
-      <circle cx="${cx}" cy="${cy - 10}" r="${r}" fill="rgba(15, 23, 42, 0.55)" stroke="#F59E0B" stroke-width="2.5" stroke-dasharray="10 6" />
-      <circle cx="${cx}" cy="${cy - 10}" r="${r - 22}" fill="rgba(245, 158, 11, 0.08)" stroke="rgba(255,255,255,0.2)" stroke-width="1.5" />
-      <!-- Object / Hand Detail Silhouette -->
-      <rect x="${cx - 48}" y="${cy - 58}" width="96" height="76" rx="16" fill="rgba(245, 158, 11, 0.28)" stroke="#FBBF24" stroke-width="2.5" />
-      <path d="M ${cx - 85} ${cy + 40} Q ${cx - 30} ${cy + 5} ${cx + 20} ${cy + 25}" fill="none" stroke="#38BDF8" stroke-width="4" stroke-linecap="round" />
-      <text x="${cx}" y="${cy - 14}" fill="#FEF3C7" font-family="sans-serif" font-weight="800" font-size="18" text-anchor="middle">🔍 โฟกัสจุดเด่นใกล้ๆ</text>
-      <text x="${cx}" y="${cy + 12}" fill="#FDE68A" font-family="sans-serif" font-weight="600" font-size="13" text-anchor="middle">(หลังเบลอ • เลนส์ 1x / 2x)</text>
+      <!-- Soft Out-of-Focus Foreground Frame (Left & Right) -->
+      <ellipse cx="${width * 0.12}" cy="${cy}" rx="${width * 0.16}" ry="${height * 0.42}" fill="rgba(180, 83, 9, 0.18)" stroke="rgba(217, 119, 6, 0.45)" stroke-width="2" stroke-dasharray="6 6"/>
+      <ellipse cx="${width * 0.88}" cy="${cy - 40}" rx="${width * 0.14}" ry="${height * 0.35}" fill="rgba(16, 185, 129, 0.14)" stroke="rgba(16, 185, 129, 0.35)" stroke-width="2" stroke-dasharray="6 6"/>
+      <!-- Midground Sharp Subject -->
+      <circle cx="${cx}" cy="${cy - 32}" r="28" fill="rgba(217, 119, 6, 0.25)" stroke="#D97706" stroke-width="2.5"/>
+      <path d="M ${cx - 58} ${cy + 58} C ${cx - 58} ${cy + 2}, ${cx + 58} ${cy + 2}, ${cx + 58} ${cy + 58} Z" fill="rgba(217, 119, 6, 0.18)" stroke="#D97706" stroke-width="2.5"/>
+      <!-- Depth Layer Labels -->
+      <text x="${width * 0.12}" y="${cy}" fill="#F59E0B" font-family="sans-serif" font-weight="800" font-size="13" text-anchor="middle">ฉากหน้าเบลอ</text>
+      <text x="${cx}" y="${cy + 82}" fill="#18181B" font-family="sans-serif" font-weight="800" font-size="14" text-anchor="middle">ตัวแบบคมชัด (Layer 2) • หลังละลาย (Layer 3)</text>
     `;
   }
 
-  // 2. Wide / Establishing / Landscape Shot (มุมกว้างเห็นสถานที่ + ตัวแบบ)
-  if (/wide|establishing|มุมกว้าง|พาโนรามา|0\.5x|สถานที่/.test(a)) {
-    const horizonY = cy + 35;
+  // 2. Fan Ho: Chiaroscuro Light Shafts & Architectural Scale
+  if (/fan ho|แสงเงา|chiaroscuro|ย้อนแสง|เงาทอดยาว|scale|สถาปัตย/.test(tech)) {
     return `
-      <!-- Sun / Sky Element -->
-      <circle cx="${cx + 160}" cy="${cy - 100}" r="36" fill="rgba(251, 191, 36, 0.22)" stroke="#FBBF24" stroke-width="2" />
-      <!-- Distant Mountains / Architecture Silhouette -->
-      <path d="M ${width * 0.1} ${horizonY} L ${cx - 140} ${cy - 75} L ${cx - 20} ${horizonY} L ${cx + 95} ${cy - 95} L ${width * 0.9} ${horizonY} Z" fill="rgba(56, 189, 248, 0.12)" stroke="rgba(56, 189, 248, 0.4)" stroke-width="2" />
-      <!-- Horizon Line -->
-      <line x1="${width * 0.08}" y1="${horizonY}" x2="${width * 0.92}" y2="${horizonY}" stroke="rgba(255,255,255,0.25)" stroke-width="2" />
-      <!-- Full-Body Subject on Rule of Thirds (Left-Third) -->
-      <circle cx="${cx - 90}" cy="${horizonY - 48}" r="16" fill="#F59E0B" />
-      <path d="M ${cx - 114} ${horizonY + 25} C ${cx - 114} ${horizonY - 22}, ${cx - 66} ${horizonY - 22}, ${cx - 66} ${horizonY + 25} Z" fill="rgba(245, 158, 11, 0.45)" stroke="#FBBF24" stroke-width="2" />
-      <text x="${cx + 60}" y="${horizonY - 25}" fill="#E0F2FE" font-family="sans-serif" font-weight="800" font-size="17" text-anchor="middle">🏞️ เก็บบรรยากาศสถานที่กว้างๆ</text>
-      <text x="${cx + 60}" y="${horizonY}" fill="#7DD3FC" font-family="sans-serif" font-weight="600" font-size="13" text-anchor="middle">(เลนส์มุมกว้าง 0.5x / 1x)</text>
+      <!-- Diagonal Sunlight Shafts -->
+      <polygon points="${width * 0.15},0 ${width * 0.52},0 ${width * 0.85},${height * 0.72} ${width * 0.42},${height * 0.72}" fill="rgba(245, 158, 11, 0.16)"/>
+      <line x1="${width * 0.15}" y1="0" x2="${width * 0.42}" y2="${height * 0.72}" stroke="#D97706" stroke-width="2" stroke-dasharray="8 6"/>
+      <line x1="${width * 0.52}" y1="0" x2="${width * 0.85}" y2="${height * 0.72}" stroke="#D97706" stroke-width="2" stroke-dasharray="8 6"/>
+      <!-- Dramatic Shadow Block -->
+      <rect x="${width * 0.06}" y="${cy - 110}" width="${width * 0.22}" height="210" rx="8" fill="rgba(24, 24, 27, 0.12)" stroke="rgba(24,24,27,0.22)" stroke-width="1.5"/>
+      <!-- Small Subject Standing in the Light Beam -->
+      <circle cx="${cx + 70}" cy="${cy + 8}" r="14" fill="#18181B"/>
+      <path d="M ${cx + 50} ${cy + 62} C ${cx + 50} ${cy + 26}, ${cx + 90} ${cy + 26}, ${cx + 90} ${cy + 62} Z" fill="#18181B"/>
+      <!-- Long Ground Shadow -->
+      <ellipse cx="${cx + 25}" cy="${cy + 66}" rx="48" ry="8" fill="rgba(24,24,27,0.2)"/>
+      <text x="${cx}" y="${cy - 80}" fill="#B45309" font-family="sans-serif" font-weight="800" font-size="14" text-anchor="middle">☀️ ลำแสงเฉียงสร้างมิติแสงเงา (Chiaroscuro)</text>
     `;
   }
 
-  // 3. POV / Walking / First-Person Shot (มุมมองสายตาเดินพาเที่ยว)
-  if (/pov|walking|สายตา|เดินตาม|first person/.test(a)) {
-    const horizonY = cy - 20;
+  // 3. Steve McCurry / Leading Lines & Frame-within-a-Frame
+  if (/mccurry|เส้นนำสายตา|leading|ซุ้มประตู|frame|มุมกว้าง|wide/.test(tech)) {
+    const horizonY = cy + 20;
     return `
-      <!-- Perspective Pathway -->
-      <line x1="${cx - 35}" y1="${horizonY}" x2="${cx - 220}" y2="${height * 0.85}" stroke="rgba(52, 211, 153, 0.5)" stroke-width="2.5" stroke-dasharray="8 6" />
-      <line x1="${cx + 35}" y1="${horizonY}" x2="${cx + 220}" y2="${height * 0.85}" stroke="rgba(52, 211, 153, 0.5)" stroke-width="2.5" stroke-dasharray="8 6" />
-      <!-- Forward Motion Arrow -->
-      <path d="M ${cx} ${cy + 55} L ${cx} ${cy - 35}" stroke="#10B981" stroke-width="5" stroke-linecap="round" />
-      <path d="M ${cx - 18} ${cy - 15} L ${cx} ${cy - 38} L ${cx + 18} ${cy - 15}" fill="none" stroke="#10B981" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" />
-      <text x="${cx}" y="${cy + 85}" fill="#D1FAE5" font-family="sans-serif" font-weight="800" font-size="17" text-anchor="middle">🚶‍♂️ มุมมองสายตา (POV) เดินพาชม</text>
+      <!-- Architectural Archway / Frame-within-a-Frame -->
+      <rect x="${width * 0.14}" y="${height * 0.16}" width="${width * 0.72}" height="${height * 0.56}" rx="20" fill="none" stroke="rgba(24,24,27,0.25)" stroke-width="2.5"/>
+      <!-- Converging Leading Lines -->
+      <line x1="${width * 0.08}" y1="${height * 0.72}" x2="${cx + 55}" y2="${horizonY}" stroke="#0284C7" stroke-width="2.5" stroke-dasharray="8 5"/>
+      <line x1="${width * 0.92}" y1="${height * 0.72}" x2="${cx + 55}" y2="${horizonY}" stroke="#0284C7" stroke-width="2.5" stroke-dasharray="8 5"/>
+      <!-- Subject on Right Third Intersection -->
+      <circle cx="${cx + 55}" cy="${horizonY - 26}" r="18" fill="#D97706"/>
+      <path d="M ${cx + 30} ${horizonY + 34} C ${cx + 30} ${horizonY - 4}, ${cx + 80} ${horizonY - 4}, ${cx + 80} ${horizonY + 34} Z" fill="rgba(217, 119, 6, 0.35)" stroke="#B45309" stroke-width="2"/>
+      <text x="${cx - 80}" y="${horizonY - 12}" fill="#0369A1" font-family="sans-serif" font-weight="800" font-size="14" text-anchor="middle">↗ เส้นนำสายตาสู่ตัวแบบ</text>
     `;
   }
 
-  // 4. Default: Medium / Vlog / Waist-Up Subject Shot (ถ่ายคนครึ่งตัวเล่าเรื่อง + เห็นฉากหลัง)
+  // 4. Close-Up / Still Life Detail (William Eggleston / Macro)
+  if (/eggleston|macro|detail|close-up|มาโคร|ใกล้|อาหาร|แก้ว|ดีเทล/.test(tech)) {
+    return `
+      <!-- Soft Bokeh Circles -->
+      <circle cx="${cx - 150}" cy="${cy - 60}" r="36" fill="rgba(217, 119, 6, 0.12)"/>
+      <circle cx="${cx + 165}" cy="${cy - 45}" r="48" fill="rgba(14, 165, 233, 0.10)"/>
+      <!-- Focus Circle -->
+      <circle cx="${cx}" cy="${cy - 5}" r="96" fill="rgba(255,255,255,0.65)" stroke="#D97706" stroke-width="2.5" stroke-dasharray="10 6"/>
+      <rect x="${cx - 42}" y="${cy - 42}" width="84" height="68" rx="14" fill="rgba(217, 119, 6, 0.22)" stroke="#B45309" stroke-width="2"/>
+      <text x="${cx}" y="${cy - 4}" fill="#78350F" font-family="sans-serif" font-weight="800" font-size="15" text-anchor="middle">🔍 เจาะดีเทล</text>
+      <text x="${cx}" y="${cy + 16}" fill="#92400E" font-family="sans-serif" font-weight="600" font-size="12" text-anchor="middle">หลังละลาย (2x)</text>
+    `;
+  }
+
+  // 5. Default Portrait / Decisive Moment (Peter Lindbergh / Cartier-Bresson)
   return `
-    <!-- Background Environment Frame -->
-    <rect x="${cx - 190}" y="${cy - 105}" width="380" height="190" rx="18" fill="rgba(30, 41, 59, 0.45)" stroke="rgba(148, 163, 184, 0.22)" stroke-width="1.5" />
-    <!-- Person Waist-Up Silhouette -->
-    <circle cx="${cx}" cy="${cy - 48}" r="30" fill="rgba(245, 158, 11, 0.35)" stroke="#FBBF24" stroke-width="2.5" />
-    <path d="M ${cx - 64} ${cy + 55} C ${cx - 64} ${cy - 5}, ${cx + 64} ${cy - 5}, ${cx + 64} ${cy + 55} Z" fill="rgba(245, 158, 11, 0.28)" stroke="#FBBF24" stroke-width="2.5" />
-    <!-- Focus Brackets Around Subject -->
-    <path d="M ${cx - 85} ${cy - 75} L ${cx - 85} ${cy - 90} L ${cx - 70} ${cy - 90}" fill="none" stroke="#38BDF8" stroke-width="2.5" />
-    <path d="M ${cx + 85} ${cy - 75} L ${cx + 85} ${cy - 90} L ${cx + 70} ${cy - 90}" fill="none" stroke="#38BDF8" stroke-width="2.5" />
-    <text x="${cx}" y="${cy + 80}" fill="#FEF3C7" font-family="sans-serif" font-weight="800" font-size="16" text-anchor="middle">👤 วางตัวแบบกลางค่อนล่าง • เห็นบรรยากาศหลัง</text>
+    <!-- Side Light Direction Arrow -->
+    <path d="M ${width * 0.12} ${cy - 70} L ${cx - 85} ${cy - 30}" stroke="#D97706" stroke-width="3" stroke-linecap="round"/>
+    <text x="${width * 0.16}" y="${cy - 82}" fill="#B45309" font-family="sans-serif" font-weight="800" font-size="13">☀️ แสงข้าง 45° สร้างมิติใบหน้า</text>
+    <!-- Rule of Thirds Focus Subject -->
+    <circle cx="${cx}" cy="${cy - 36}" r="30" fill="rgba(217, 119, 6, 0.22)" stroke="#B45309" stroke-width="2.5"/>
+    <path d="M ${cx - 64} ${cy + 58} C ${cx - 64} ${cy + 2}, ${cx + 64} ${cy + 2}, ${cx + 64} ${cy + 58} Z" fill="rgba(24, 24, 27, 0.08)" stroke="#18181B" stroke-width="2"/>
+    <!-- Eye-level guide line -->
+    <line x1="${width * 0.12}" y1="${cy - 36}" x2="${width * 0.88}" y2="${cy - 36}" stroke="rgba(2, 132, 199, 0.35)" stroke-width="1.5" stroke-dasharray="6 4"/>
+    <text x="${cx}" y="${cy + 82}" fill="#18181B" font-family="sans-serif" font-weight="800" font-size="14" text-anchor="middle">👤 วางระดับสายตาบนเส้นตัด 1/3 ด้านบน</text>
+  `;
+}
+
+function buildVideoMotionArt(shot, cx, cy, width, height) {
+  const a = String((shot?.camera_angle || '') + ' ' + (shot?.camera_movement || '')).toLowerCase();
+  if (/macro|close-up|ใกล้|เจาะ/.test(a)) {
+    return `
+      <circle cx="${cx}" cy="${cy}" r="92" fill="rgba(255,255,255,0.7)" stroke="#D97706" stroke-width="2.5" stroke-dasharray="8 5"/>
+      <rect x="${cx - 42}" y="${cy - 34}" width="84" height="64" rx="14" fill="rgba(217,119,6,0.22)" stroke="#B45309" stroke-width="2"/>
+      <text x="${cx}" y="${cy + 6}" fill="#78350F" font-family="sans-serif" font-weight="800" font-size="15" text-anchor="middle">🔍 โคลสอัพ (2x)</text>
+    `;
+  }
+  if (/pov|เดิน|ตามหลัง|push|walk|forward/.test(a)) {
+    return `
+      <line x1="${cx - 32}" y1="${cy - 40}" x2="${cx - 190}" y2="${height * 0.72}" stroke="rgba(5,150,105,0.45)" stroke-width="2.5" stroke-dasharray="8 5"/>
+      <line x1="${cx + 32}" y1="${cy - 40}" x2="${cx + 190}" y2="${height * 0.72}" stroke="rgba(5,150,105,0.45)" stroke-width="2.5" stroke-dasharray="8 5"/>
+      <path d="M ${cx} ${cy + 50} L ${cx} ${cy - 35}" stroke="#059669" stroke-width="4.5" stroke-linecap="round"/>
+      <path d="M ${cx - 16} ${cy - 15} L ${cx} ${cy - 38} L ${cx + 16} ${cy - 15}" fill="none" stroke="#059669" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"/>
+      <text x="${cx}" y="${cy + 78}" fill="#065F46" font-family="sans-serif" font-weight="800" font-size="14" text-anchor="middle">🚶‍♂️ เดินถือกล้องดันเข้าช้าๆ (Smooth Push-In)</text>
+    `;
+  }
+  return `
+    <circle cx="${cx}" cy="${cy - 34}" r="28" fill="rgba(217, 119, 6, 0.2)" stroke="#D97706" stroke-width="2.5"/>
+    <path d="M ${cx - 58} ${cy + 52} C ${cx - 58} ${cy + 2}, ${cx + 58} ${cy + 2}, ${cx + 58} ${cy + 52} Z" fill="rgba(24, 24, 27, 0.08)" stroke="#18181B" stroke-width="2"/>
+    <!-- Smooth Horizontal Pan Arrow -->
+    <path d="M ${cx - 130} ${cy + 76} L ${cx + 130} ${cy + 76}" stroke="#0284C7" stroke-width="3" stroke-linecap="round"/>
+    <path d="M ${cx + 114} ${cy + 66} L ${cx + 132} ${cy + 76} L ${cx + 114} ${cy + 86}" fill="none" stroke="#0284C7" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+    <text x="${cx}" y="${cy + 100}" fill="#0369A1" font-family="sans-serif" font-weight="800" font-size="13" text-anchor="middle">🎥 จัดตัวแบบกลางค่อนล่าง • เคลื่อนกล้องนุ่มนวล</text>
   `;
 }
 
 function getStoryboardSketch(shot) {
+  const isPhoto = shot?.mode === 'photo';
   const shotNum = shot?.step_number || shot?.shot_number || 1;
-  const angle = escapeXml(shot?.camera_angle_th || shot?.camera_angle || 'มุมปานกลาง (Medium Shot)');
+  const angle = escapeXml(shot?.camera_angle_th || shot?.camera_angle || 'Medium Shot');
   const lens = escapeXml(shot?.lens_focal || shot?.shot_size || 'เลนส์ 1x');
-  const title = escapeXml((shot?.title || `ฉากที่ ${shotNum}`).slice(0, 48));
-  const actionText = escapeXml((shot?.action_description || shot?.content || 'ตั้งกล้องถ่ายตามจังหวะธรรมชาติ').slice(0, 82));
-  const onScreenText = escapeXml((shot?.on_screen_text || `ข้อความพาดหัวฉากที่ ${shotNum}`).slice(0, 44));
-  const roleBadge = escapeXml((shot?.shot_role || (shotNum === 1 ? '🎯 HOOK ดึงคนดู' : '🎬 ฉากเล่าเรื่อง')).slice(0, 26));
+  const title = escapeXml((shot?.title || `ช็อตที่ ${shotNum}`).slice(0, 48));
+  const onScreenText = escapeXml((shot?.on_screen_text || '').slice(0, 44));
+  const badgeText = escapeXml(
+    isPhoto
+      ? (shot?.master_photographer || 'Master Composition').slice(0, 34)
+      : (shot?.shot_role || (shotNum === 1 ? '🎯 HOOK ดึงคนดู' : `ฉากที่ ${shotNum}`)).slice(0, 28)
+  );
   const duration = shot?.duration_seconds ? `${shot.duration_seconds} วิ` : '3.0 วิ';
 
-  const isVertical = shot?.aspect_ratio === '9:16';
-  const width = isVertical ? 720 : 1280;
-  const height = isVertical ? 1280 : 720;
+  const width = 960;
+  const height = 540;
   const cx = width / 2;
-  const cy = height * 0.46;
+  const cy = height * 0.49;
 
-  const subjectArt = buildSubjectIllustration(shot?.camera_angle || shot?.camera_angle_th, cx, cy, width, height, isVertical);
+  const illustration = isPhoto
+    ? buildPhotoCompositionArt(shot, cx, cy, width, height)
+    : buildVideoMotionArt(shot, cx, cy, width, height);
 
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" width="${width}" height="${height}">
   <defs>
-    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#0F172A"/>
-      <stop offset="55%" stop-color="#1E293B"/>
-      <stop offset="100%" stop-color="#090D16"/>
+    <linearGradient id="paperBg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FDFCF8"/>
+      <stop offset="100%" stop-color="#F2EFE7"/>
     </linearGradient>
-    <pattern id="gridPattern" width="48" height="48" patternUnits="userSpaceOnUse">
-      <path d="M 48 0 L 0 0 0 48" fill="none" stroke="rgba(255,255,255,0.04)" stroke-width="1"/>
+    <pattern id="dotGrid" width="28" height="28" patternUnits="userSpaceOnUse">
+      <circle cx="14" cy="14" r="1" fill="rgba(24,24,27,0.09)"/>
     </pattern>
   </defs>
 
-  <!-- Canvas Background -->
-  <rect width="100%" height="100%" fill="url(#bgGrad)"/>
-  <rect width="100%" height="100%" fill="url(#gridPattern)"/>
+  <!-- Warm Editorial Paper Background -->
+  <rect width="100%" height="100%" fill="url(#paperBg)"/>
+  <rect width="100%" height="100%" fill="url(#dotGrid)"/>
 
   <!-- Rule of Thirds Grid -->
-  <line x1="${width * 0.333}" y1="0" x2="${width * 0.333}" y2="${height}" stroke="rgba(255,255,255,0.07)" stroke-width="1" stroke-dasharray="6 6"/>
-  <line x1="${width * 0.666}" y1="0" x2="${width * 0.666}" y2="${height}" stroke="rgba(255,255,255,0.07)" stroke-width="1" stroke-dasharray="6 6"/>
-  <line x1="0" y1="${height * 0.333}" x2="${width}" y2="${height * 0.333}" stroke="rgba(255,255,255,0.07)" stroke-width="1" stroke-dasharray="6 6"/>
-  <line x1="0" y1="${height * 0.666}" x2="${width}" y2="${height * 0.666}" stroke="rgba(255,255,255,0.07)" stroke-width="1" stroke-dasharray="6 6"/>
+  <line x1="${width * 0.333}" y1="0" x2="${width * 0.333}" y2="${height}" stroke="rgba(24,24,27,0.08)" stroke-width="1" stroke-dasharray="6 6"/>
+  <line x1="${width * 0.666}" y1="0" x2="${width * 0.666}" y2="${height}" stroke="rgba(24,24,27,0.08)" stroke-width="1" stroke-dasharray="6 6"/>
+  <line x1="0" y1="${height * 0.333}" x2="${width}" y2="${height * 0.333}" stroke="rgba(24,24,27,0.08)" stroke-width="1" stroke-dasharray="6 6"/>
+  <line x1="0" y1="${height * 0.666}" x2="${width}" y2="${height * 0.666}" stroke="rgba(24,24,27,0.08)" stroke-width="1" stroke-dasharray="6 6"/>
 
-  <!-- Top Header Badge Bar -->
-  <rect x="${width * 0.05}" y="${height * 0.04}" width="${isVertical ? 140 : 120}" height="38" rx="10" fill="#F59E0B"/>
-  <text x="${width * 0.05 + (isVertical ? 70 : 60)}" y="${height * 0.04 + 25}" fill="#090D16" font-family="sans-serif" font-weight="900" font-size="16" text-anchor="middle">ฉากที่ ${shotNum} (${duration})</text>
+  <!-- Top Bar Badges -->
+  <rect x="28" y="22" width="${isPhoto ? 124 : 148}" height="34" rx="10" fill="#18181B"/>
+  <text x="${isPhoto ? 90 : 102}" y="44" fill="#FFFFFF" font-family="sans-serif" font-weight="800" font-size="14" text-anchor="middle">${isPhoto ? `ภาพที่ ${shotNum}` : `ฉากที่ ${shotNum} (${duration})`}</text>
 
-  <rect x="${width * 0.05 + (isVertical ? 152 : 132)}" y="${height * 0.04}" width="${isVertical ? 230 : 220}" height="38" rx="10" fill="rgba(16, 185, 129, 0.2)" stroke="#10B981" stroke-width="1.5"/>
-  <text x="${width * 0.05 + (isVertical ? 267 : 242)}" y="${height * 0.04 + 25}" fill="#A7F3D0" font-family="sans-serif" font-weight="700" font-size="14" text-anchor="middle">${roleBadge}</text>
+  <rect x="${isPhoto ? 164 : 188}" y="22" width="320" height="34" rx="10" fill="#FEF3C7" stroke="#F59E0B" stroke-width="1.5"/>
+  <text x="${isPhoto ? 324 : 348}" y="44" fill="#92400E" font-family="sans-serif" font-weight="800" font-size="13" text-anchor="middle">${isPhoto ? `🏆 ${badgeText}` : badgeText}</text>
 
-  <!-- TEXT SAFE-ZONE BOX (บอกจุดที่ต้องเว้นว่างไว้ใส่ข้อความบนจอ!) -->
-  <rect x="${width * 0.1}" y="${height * 0.13}" width="${width * 0.8}" height="${isVertical ? 78 : 58}" rx="12" fill="rgba(245, 158, 11, 0.14)" stroke="#FBBF24" stroke-width="2" stroke-dasharray="8 5"/>
-  <text x="${cx}" y="${height * 0.13 + (isVertical ? 28 : 22)}" fill="#FDE68A" font-family="sans-serif" font-weight="700" font-size="13" text-anchor="middle">📐 โซนเว้นพื้นที่ว่างใส่ข้อความพาดหัว (ห้ามให้หัวคนบังโซนนี้)</text>
-  <text x="${cx}" y="${height * 0.13 + (isVertical ? 56 : 44)}" fill="#FFFFFF" font-family="sans-serif" font-weight="800" font-size="${isVertical ? 20 : 17}" text-anchor="middle">“${onScreenText}”</text>
+  <rect x="${width - 178}" y="22" width="150" height="34" rx="10" fill="#FFFFFF" stroke="#D6D3CB" stroke-width="1.5"/>
+  <text x="${width - 103}" y="44" fill="#3F3F46" font-family="sans-serif" font-weight="700" font-size="13" text-anchor="middle">📱 ${lens}</text>
 
-  <!-- Subject & Angle Composition Visual -->
-  ${subjectArt}
+  <!-- Text Safe-Zone Banner -->
+  ${onScreenText ? `
+  <rect x="${width * 0.14}" y="72" width="${width * 0.72}" height="52" rx="12" fill="rgba(255, 251, 235, 0.92)" stroke="#D97706" stroke-width="1.8" stroke-dasharray="7 4"/>
+  <text x="${cx}" y="92" fill="#B45309" font-family="sans-serif" font-weight="700" font-size="11" text-anchor="middle">📐 โซนเว้นพื้นที่ว่างสำหรับวางข้อความพาดหัว (ห้ามให้ใบหน้าบังโซนนี้)</text>
+  <text x="${cx}" y="114" fill="#18181B" font-family="sans-serif" font-weight="800" font-size="15" text-anchor="middle">“${onScreenText}”</text>
+  ` : ''}
 
-  <!-- Bottom Shooting Instruction Card -->
-  <rect x="${width * 0.06}" y="${height * 0.71}" width="${width * 0.88}" height="${height * 0.23}" rx="16" fill="rgba(9, 13, 22, 0.9)" stroke="rgba(255,255,255,0.15)" stroke-width="1.5"/>
-  
-  <text x="${width * 0.09}" y="${height * 0.76}" fill="#38BDF8" font-family="sans-serif" font-weight="800" font-size="${isVertical ? 18 : 15}">🎥 มุมกล้อง: ${angle} • ${lens}</text>
-  <text x="${width * 0.09}" y="${height * 0.82}" fill="#FFFFFF" font-family="sans-serif" font-weight="800" font-size="${isVertical ? 22 : 18}">${title}</text>
-  <text x="${width * 0.09}" y="${height * 0.88}" fill="#CBD5E1" font-family="sans-serif" font-size="${isVertical ? 17 : 14}">👉 ถ่ายอะไร: ${actionText}</text>
+  <!-- Visual Subject & Composition Diagram -->
+  ${illustration}
+
+  <!-- Bottom Editorial Footer -->
+  <rect x="28" y="${height - 86}" width="${width - 56}" height="64" rx="14" fill="rgba(255,255,255,0.92)" stroke="#E4E1D8" stroke-width="1.5"/>
+  <text x="48" y="${height - 58}" fill="#18181B" font-family="sans-serif" font-weight="800" font-size="16">${title}</text>
+  <text x="48" y="${height - 34}" fill="#52525B" font-family="sans-serif" font-weight="600" font-size="13">📐 ${angle}</text>
 </svg>`;
 
   return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
